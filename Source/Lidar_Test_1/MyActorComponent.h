@@ -35,6 +35,9 @@ public:
         
         UPROPERTY(BlueprintReadOnly, Category="Pose")
         UBodyPoseManager* BodyPoseManager;
+
+        UFUNCTION(BlueprintCallable, Category="AR")
+        void SetRenderTarget(UTextureRenderTarget2D* InRenderTarget);
         
         UPROPERTY(EditAnywhere, BlueprintReadWrite)
         UTextureRenderTarget2D* RenderTarget;

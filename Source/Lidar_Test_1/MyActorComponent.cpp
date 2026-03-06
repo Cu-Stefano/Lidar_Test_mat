@@ -104,6 +104,10 @@ void UMyActorComponent::OnTextureChange() const
     BodyPoseManager->PerformPoseDetection(RawBytes, Width, Height);
 }
 
+void UMyActorComponent::SetRenderTarget(UTextureRenderTarget2D* InRenderTarget)
+{
+    RenderTarget = InRenderTarget;
+}
 
 TArray<uint8> UMyActorComponent::GetRenderTargetBytes() const
 {
