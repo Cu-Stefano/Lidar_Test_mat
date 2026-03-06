@@ -180,13 +180,16 @@ void AARHUD::DrawHUD()
         }
 
         const FVector2D ScreenPos = ToScreenSpace(Joint.X, Joint.Y);
+        const float DotHalf = JointDotSize * 0.5f;
+        const float DotX = ScreenPos.X - DotHalf;
+        const float DotY = ScreenPos.Y - DotHalf;
 
         if (JointDotMaterial)
         {
             DrawMaterial(
                 JointDotMaterial,
-                ScreenPos.X,
-                ScreenPos.Y,
+            DotX,
+            DotY,
                 JointDotSize,
                 JointDotSize,
                 0.0f,
@@ -199,16 +202,24 @@ void AARHUD::DrawHUD()
                 FVector2D::ZeroVector
             );
         }
+        else
+        {
+            // Fallback marker when no dot material is assigned in the HUD defaults.
+            DrawRect(JointTextColor, DotX, DotY, JointDotSize, JointDotSize);
+        }
 
-        DrawText(
-            Joint.Name,
-            JointTextColor,
-            ScreenPos.X,
-            ScreenPos.Y + JointTextYOffset,
-            JointFont,
-            JointTextScale,
-            false
-        );
+        if (bDrawJointLabels)
+        {
+            DrawText(
+                Joint.Name,
+                JointTextColor,
+                ScreenPos.X,
+                ScreenPos.Y + JointTextYOffset,
+                JointFont,
+                JointTextScale,
+                false
+            );
+        }
     }
 }
 
@@ -243,8 +254,13 @@ FVector2D AARHUD::ToScreenSpace(float X, float Y) const
     const bool bNormalizedX = (X >= 0.0f && X <= 1.0f);
     const bool bNormalizedY = (Y >= 0.0f && Y <= 1.0f);
 
-    return FVector2D(
-        bNormalizedX ? X * Width : X,
-        bNormalizedY ? Y * Height : Y
-    );
+    const float ScreenX = bNormalizedX ? X * Width : X;
+    float ScreenY = bNormalizedY ? Y * Height : Y;
+
+    if (bNormalizedY && bFlipNormalizedJointY)
+    {
+        ScreenY = Height - ScreenY;
+    }
+
+    return FVector2D(ScreenX, ScreenY);
 }

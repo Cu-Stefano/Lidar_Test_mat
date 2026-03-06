@@ -83,6 +83,12 @@ protected:
     float MinJointConfidence = 0.05f;
 
     UPROPERTY(EditAnywhere, Category="Overlay")
+    bool bFlipNormalizedJointY = true;
+
+    UPROPERTY(EditAnywhere, Category="Overlay")
+    bool bDrawJointLabels = true;
+
+    UPROPERTY(EditAnywhere, Category="Overlay")
     UFont* JointFont = nullptr;
 
 private:
