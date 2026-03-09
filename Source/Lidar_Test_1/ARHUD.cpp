@@ -164,6 +164,7 @@ void AARHUD::BeginPlay()
     {
         CameraMaterial = UMaterialInstanceDynamic::Create(CameraMaterialBase, this);
     }
+
 }
 
 void AARHUD::Tick(float DeltaSeconds)
@@ -222,9 +223,9 @@ void AARHUD::Tick(float DeltaSeconds)
         return;
     }
 
-    float MeanDepth01 = 0.0f;
+    float MeanDepthRaw = 0.0f;
     int32 SampleCount = 0;
-    if (!ComputeDepthMeanAtUV(ThoraxUV, MeanDepth01, SampleCount))
+    if (!ComputeDepthMeanAtUV(ThoraxUV, MeanDepthRaw, SampleCount))
     {
         UE_LOG(LogTemp, Warning, TEXT("Thorax depth mean skipped: cannot sample depth texture"));
         return;
@@ -233,8 +234,8 @@ void AARHUD::Tick(float DeltaSeconds)
     UE_LOG(
         LogTemp,
         Log,
-        TEXT("Thorax depth mean: %.4f (0..1), samples=%d, uv=(%.3f, %.3f)"),
-        MeanDepth01,
+        TEXT("Thorax depth mean: %.2f (raw 0..255), samples=%d, uv=(%.3f, %.3f)"),
+        MeanDepthRaw,
         SampleCount,
         ThoraxUV.X,
         ThoraxUV.Y
@@ -411,7 +412,7 @@ bool AARHUD::TryGetThoraxDepthUV(const TArray<FPoseJoint>& Joints, FVector2D& Ou
     return true;
 }
 
-bool AARHUD::ComputeDepthMeanAtUV(const FVector2D& UV, float& OutMeanDepth01, int32& OutSampleCount)
+bool AARHUD::ComputeDepthMeanAtUV(const FVector2D& UV, float& OutMeanDepthRaw, int32& OutSampleCount)
 {
     if (!DepthMaterial)
     {
@@ -478,9 +479,9 @@ bool AARHUD::ComputeDepthMeanAtUV(const FVector2D& UV, float& OutMeanDepth01, in
             }
 
             const FColor& Pixel = PixelData[Y * Width + X];
-            const float PixelDepth01 = (static_cast<float>(Pixel.R) + static_cast<float>(Pixel.G) + static_cast<float>(Pixel.B)) / (3.0f * 255.0f);
+            const float PixelDepthRaw = static_cast<float>(Pixel.R);
 
-            DepthSum += PixelDepth01;
+            DepthSum += PixelDepthRaw;
             ++Count;
         }
     }
@@ -491,7 +492,8 @@ bool AARHUD::ComputeDepthMeanAtUV(const FVector2D& UV, float& OutMeanDepth01, in
     }
 
     OutSampleCount = Count;
-    OutMeanDepth01 = static_cast<float>(DepthSum / static_cast<double>(Count));
+    OutMeanDepthRaw = static_cast<float>(DepthSum / static_cast<double>(Count));
+
     return true;
 }
 

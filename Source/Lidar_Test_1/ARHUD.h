@@ -111,5 +111,5 @@ private:
     FVector2D ToScreenSpace(float X, float Y) const;
     void DrawJointsOverlay();
     bool TryGetThoraxDepthUV(const TArray<FPoseJoint>& Joints, FVector2D& OutUV) const;
-    bool ComputeDepthMeanAtUV(const FVector2D& UV, float& OutMeanDepth01, int32& OutSampleCount);
+    bool ComputeDepthMeanAtUV(const FVector2D& UV, float& OutMeanDepthRaw, int32& OutSampleCount);
 };
