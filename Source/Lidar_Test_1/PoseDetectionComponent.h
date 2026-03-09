@@ -43,7 +43,7 @@ public:
         UTextureRenderTarget2D* RenderTarget;
         
         UFUNCTION(BlueprintCallable, Category="AR")
-        virtual void OnTextureChange() const;
+        virtual void PerformPoseDetectionOnFrame() const;
 protected:
     // Called when the game starts
     virtual void BeginPlay() override;

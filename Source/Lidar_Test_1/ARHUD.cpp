@@ -157,7 +157,7 @@ void AARHUD::Tick(float DeltaSeconds)
     if (PoseDetectionComponent && CameraRenderTarget)
     {
         PoseDetectionComponent->SetRenderTarget(CameraRenderTarget);
-        PoseDetectionComponent->OnTextureChange();
+        PoseDetectionComponent->PerformPoseDetectionOnFrame();
     }
 }
 

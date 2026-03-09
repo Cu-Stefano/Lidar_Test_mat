@@ -37,11 +37,11 @@ void UPoseDetectionComponent::TickComponent(float DeltaTime, ELevelTick TickType
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 }
 
-void UPoseDetectionComponent::OnTextureChange() const
+void UPoseDetectionComponent::PerformPoseDetectionOnFrame() const
 {
     if (!BodyPoseManager)
     {
-        UE_LOG(LogTemp, Warning, TEXT("OnTextureChange skipped: BodyPoseManager is null"));
+        UE_LOG(LogTemp, Warning, TEXT("PerformPoseDetectionOnFrame skipped: BodyPoseManager is null"));
         return;
     }
 
@@ -50,17 +50,11 @@ void UPoseDetectionComponent::OnTextureChange() const
 
     if (Width <= 0 || Height <= 0)
     {
-        UE_LOG(LogTemp, Warning, TEXT("OnTextureChange skipped: invalid render target size %d x %d"), Width, Height);
+        UE_LOG(LogTemp, Warning, TEXT("PerformPoseDetectionOnFrame skipped: invalid render target size %d x %d"), Width, Height);
         return;
     }
 
     TArray<uint8> RawBytes = GetRenderTargetBytes();
-
-    constexpr int32 SourceChannels = 4;
-    if (!ValidateRawBytes(RawBytes, Width, Height, SourceChannels, false))
-    {
-        return;
-    }
 
     if (!bSavedCameraFrameOnce)
     {
@@ -69,37 +63,15 @@ void UPoseDetectionComponent::OnTextureChange() const
         UE_LOG(LogTemp, Warning, TEXT("Saved first camera frame PNG (see full path in previous log line)"));
     }
 
-    if (bPoseInputSwapRedBlue || bPoseInputForceOpaqueAlpha)
+    if (bPoseInputForceOpaqueAlpha)
     {
         for (int32 i = 0; i < RawBytes.Num(); i += 4)
         {
-            if (bPoseInputSwapRedBlue)
-            {
-                Swap(RawBytes[i + 0], RawBytes[i + 2]);
-            }
-
             if (bPoseInputForceOpaqueAlpha)
             {
                 RawBytes[i + 3] = 255;
             }
         }
-    }
-
-    int32 ChannelsToSend = SourceChannels;
-    if (bPoseInputDropAlpha)
-    {
-        RawBytes = ConvertRGBAtoRGB(RawBytes);
-        ChannelsToSend = 3;
-    }
-
-    if (bPoseInputFlipY)
-    {
-        FlipImageRowsInPlace(RawBytes, Width, Height, ChannelsToSend);
-    }
-
-    if (!ValidateRawBytes(RawBytes, Width, Height, ChannelsToSend, bLogPoseInputStats))
-    {
-        return;
     }
 
     BodyPoseManager->PerformPoseDetection(RawBytes, Width, Height);
@@ -203,94 +175,4 @@ int32 UPoseDetectionComponent::GetRenderTargetWidth() const
 int32 UPoseDetectionComponent::GetRenderTargetHeight() const
 {
     return RenderTarget ? RenderTarget->SizeY : 0;
-}
-
-bool UPoseDetectionComponent::ValidateRawBytes(const TArray<uint8>& RawBytes, int32 Width, int32 Height, int32 Channels, bool bEmitStats) const
-{
-    if (Channels <= 0)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Invalid channel count: %d"), Channels);
-        return false;
-    }
-
-    const int64 ExpectedNum = static_cast<int64>(Width) * static_cast<int64>(Height) * static_cast<int64>(Channels);
-    if (ExpectedNum <= 0)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Invalid expected buffer size for %d x %d x %d"), Width, Height, Channels);
-        return false;
-    }
-
-    if (RawBytes.Num() != ExpectedNum)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Pose input size mismatch: got %d bytes, expected %lld for %d x %d x %d"), RawBytes.Num(), ExpectedNum, Width, Height, Channels);
-        return false;
-    }
-
-    if (bEmitStats && RawBytes.Num() >= Channels)
-    {
-        int32 MinValue = 255;
-        int32 MaxValue = 0;
-        uint64 Sum = 0;
-
-        for (uint8 Value : RawBytes)
-        {
-            MinValue = FMath::Min(MinValue, static_cast<int32>(Value));
-            MaxValue = FMath::Max(MaxValue, static_cast<int32>(Value));
-            Sum += Value;
-        }
-
-        const double Mean = static_cast<double>(Sum) / static_cast<double>(RawBytes.Num());
-        UE_LOG(
-            LogTemp,
-            Log,
-            TEXT("Pose input stats: bytes=%d channels=%d min=%d max=%d mean=%.2f firstPixel=(%d,%d,%d%s)"),
-            RawBytes.Num(),
-            Channels,
-            MinValue,
-            MaxValue,
-            Mean,
-            RawBytes[0],
-            RawBytes[1],
-            RawBytes[2],
-            Channels == 4 ? *FString::Printf(TEXT(",%d"), RawBytes[3]) : TEXT("")
-        );
-    }
-
-    return true;
-}
-
-TArray<uint8> UPoseDetectionComponent::ConvertRGBAtoRGB(const TArray<uint8>& RGBABytes) const
-{
-    const int32 PixelCount = RGBABytes.Num() / 4;
-    TArray<uint8> RGBBytes;
-    RGBBytes.SetNumUninitialized(PixelCount * 3);
-
-    for (int32 i = 0; i < PixelCount; ++i)
-    {
-        const int32 Src = i * 4;
-        const int32 Dst = i * 3;
-
-        RGBBytes[Dst + 0] = RGBABytes[Src + 0];
-        RGBBytes[Dst + 1] = RGBABytes[Src + 1];
-        RGBBytes[Dst + 2] = RGBABytes[Src + 2];
-    }
-
-    return RGBBytes;
-}
-
-void UPoseDetectionComponent::FlipImageRowsInPlace(TArray<uint8>& Bytes, int32 Width, int32 Height, int32 Channels) const
-{
-    const int32 RowStride = Width * Channels;
-    TArray<uint8> TempRow;
-    TempRow.SetNumUninitialized(RowStride);
-
-    for (int32 Y = 0; Y < Height / 2; ++Y)
-    {
-        const int32 TopOffset = Y * RowStride;
-        const int32 BottomOffset = (Height - 1 - Y) * RowStride;
-
-        FMemory::Memcpy(TempRow.GetData(), Bytes.GetData() + TopOffset, RowStride);
-        FMemory::Memcpy(Bytes.GetData() + TopOffset, Bytes.GetData() + BottomOffset, RowStride);
-        FMemory::Memcpy(Bytes.GetData() + BottomOffset, TempRow.GetData(), RowStride);
-    }
 }
