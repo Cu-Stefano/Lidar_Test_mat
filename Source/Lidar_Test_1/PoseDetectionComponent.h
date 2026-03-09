@@ -6,17 +6,17 @@
 #include "Components/ActorComponent.h"
 #include "ARTextures.h"
 #include "BodyPoseManager.h"
-#include "MyActorComponent.generated.h"
+#include "PoseDetectionComponent.generated.h"
 
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
-class LIDAR_TEST_1_API UMyActorComponent : public UActorComponent
+class LIDAR_TEST_1_API UPoseDetectionComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:	
 	// Sets default values for this component's properties
-        UMyActorComponent();
+        UPoseDetectionComponent();
 
         UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Pose|Debug")
         bool bPoseInputDropAlpha = false;

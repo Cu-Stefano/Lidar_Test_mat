@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "MyActorComponent.h"
+#include "PoseDetectionComponent.h"
 #include "ImageUtils.h"
 #include "IImageWrapper.h"
 #include "IImageWrapperModule.h"
@@ -11,17 +11,18 @@
 
 
 // Sets default values for this component's properties
-UMyActorComponent::UMyActorComponent()
+UPoseDetectionComponent::UPoseDetectionComponent()
 {
 	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
+    
 
 	// ...
 }
 
 // Called when the game starts
-void UMyActorComponent::BeginPlay()
+void UPoseDetectionComponent::BeginPlay()
 {
     Super::BeginPlay();
 
@@ -31,12 +32,12 @@ void UMyActorComponent::BeginPlay()
 
 
 // Called every frame
-void UMyActorComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+void UPoseDetectionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 }
 
-void UMyActorComponent::OnTextureChange() const
+void UPoseDetectionComponent::OnTextureChange() const
 {
     if (!BodyPoseManager)
     {
@@ -104,12 +105,12 @@ void UMyActorComponent::OnTextureChange() const
     BodyPoseManager->PerformPoseDetection(RawBytes, Width, Height);
 }
 
-void UMyActorComponent::SetRenderTarget(UTextureRenderTarget2D* InRenderTarget)
+void UPoseDetectionComponent::SetRenderTarget(UTextureRenderTarget2D* InRenderTarget)
 {
     RenderTarget = InRenderTarget;
 }
 
-TArray<uint8> UMyActorComponent::GetRenderTargetBytes() const
+TArray<uint8> UPoseDetectionComponent::GetRenderTargetBytes() const
 {
     if (!RenderTarget)
     {
@@ -152,7 +153,7 @@ TArray<uint8> UMyActorComponent::GetRenderTargetBytes() const
     return RGBABytes;
 }
 
-void UMyActorComponent::SaveRenderTargetToPNG() const
+void UPoseDetectionComponent::SaveRenderTargetToPNG() const
 {
     if (!RenderTarget) return;
 
@@ -194,17 +195,17 @@ void UMyActorComponent::SaveRenderTargetToPNG() const
     }
 }
 
-int32 UMyActorComponent::GetRenderTargetWidth() const
+int32 UPoseDetectionComponent::GetRenderTargetWidth() const
 {
     return RenderTarget ? RenderTarget->SizeX : 0;
 }
 
-int32 UMyActorComponent::GetRenderTargetHeight() const
+int32 UPoseDetectionComponent::GetRenderTargetHeight() const
 {
     return RenderTarget ? RenderTarget->SizeY : 0;
 }
 
-bool UMyActorComponent::ValidateRawBytes(const TArray<uint8>& RawBytes, int32 Width, int32 Height, int32 Channels, bool bEmitStats) const
+bool UPoseDetectionComponent::ValidateRawBytes(const TArray<uint8>& RawBytes, int32 Width, int32 Height, int32 Channels, bool bEmitStats) const
 {
     if (Channels <= 0)
     {
@@ -258,7 +259,7 @@ bool UMyActorComponent::ValidateRawBytes(const TArray<uint8>& RawBytes, int32 Wi
     return true;
 }
 
-TArray<uint8> UMyActorComponent::ConvertRGBAtoRGB(const TArray<uint8>& RGBABytes) const
+TArray<uint8> UPoseDetectionComponent::ConvertRGBAtoRGB(const TArray<uint8>& RGBABytes) const
 {
     const int32 PixelCount = RGBABytes.Num() / 4;
     TArray<uint8> RGBBytes;
@@ -277,7 +278,7 @@ TArray<uint8> UMyActorComponent::ConvertRGBAtoRGB(const TArray<uint8>& RGBABytes
     return RGBBytes;
 }
 
-void UMyActorComponent::FlipImageRowsInPlace(TArray<uint8>& Bytes, int32 Width, int32 Height, int32 Channels) const
+void UPoseDetectionComponent::FlipImageRowsInPlace(TArray<uint8>& Bytes, int32 Width, int32 Height, int32 Channels) const
 {
     const int32 RowStride = Width * Channels;
     TArray<uint8> TempRow;

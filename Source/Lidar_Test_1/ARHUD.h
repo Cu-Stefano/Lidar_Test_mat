@@ -4,14 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
-#include "MyActorComponent.h"
+#include "PoseDetectionComponent.h"
 #include "ARHUD.generated.h"
 
 class UUserWidget;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class UTextureRenderTarget2D;
-class UMyActorComponent;
+class UPoseDetectionComponent;
 class UFont;
 
 /**
@@ -42,7 +42,7 @@ protected:
     UTextureRenderTarget2D* CameraRenderTarget = nullptr;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Rendering")
-    UMyActorComponent* MyActorComponent = nullptr;
+    UPoseDetectionComponent* PoseDetectionComponent = nullptr;
 
     // ================= Materiali =================
     UPROPERTY(EditAnywhere, Category="Rendering")

@@ -11,13 +11,13 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "Kismet/KismetRenderingLibrary.h"
 #include "UObject/ConstructorHelpers.h"
-#include "MyActorComponent.h"
+#include "PoseDetectionComponent.h"
 #include "BodyPoseManager.h"
 
 AARHUD::AARHUD()
 {
     PrimaryActorTick.bCanEverTick = true;
-    MyActorComponent = CreateDefaultSubobject<UMyActorComponent>(TEXT("MyActorComponent"));
+    PoseDetectionComponent = CreateDefaultSubobject<UPoseDetectionComponent>(TEXT("PoseDetectionComponent"));
 
     // Pure C++ setup: auto-assign project assets so BP defaults are optional.
     if (!DepthWidgetClass)
@@ -117,9 +117,9 @@ void AARHUD::BeginPlay()
         PushDepthMaterialToWidget();
     }
 
-    if (MyActorComponent && CameraRenderTarget)
+    if (PoseDetectionComponent && CameraRenderTarget)
     {
-        MyActorComponent->SetRenderTarget(CameraRenderTarget);
+        PoseDetectionComponent->SetRenderTarget(CameraRenderTarget);
     }
 
     if (CameraMaterialBase)
@@ -154,10 +154,10 @@ void AARHUD::Tick(float DeltaSeconds)
         UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, CameraRenderTarget, CameraMaterial);
     }
 
-    if (MyActorComponent && CameraRenderTarget)
+    if (PoseDetectionComponent && CameraRenderTarget)
     {
-        MyActorComponent->SetRenderTarget(CameraRenderTarget);
-        MyActorComponent->OnTextureChange();
+        PoseDetectionComponent->SetRenderTarget(CameraRenderTarget);
+        PoseDetectionComponent->OnTextureChange();
     }
 }
 
@@ -165,12 +165,12 @@ void AARHUD::DrawHUD()
 {
     Super::DrawHUD();
 
-    if (!Canvas || !MyActorComponent || !MyActorComponent->BodyPoseManager)
+    if (!Canvas || !PoseDetectionComponent || !PoseDetectionComponent->BodyPoseManager)
     {
         return;
     }
 
-    const TArray<FPoseJoint>& Joints = MyActorComponent->BodyPoseManager->DetectedJoints;
+    const TArray<FPoseJoint>& Joints = PoseDetectionComponent->BodyPoseManager->DetectedJoints;
 
     for (const FPoseJoint& Joint : Joints)
     {
