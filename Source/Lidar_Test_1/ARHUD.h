@@ -35,27 +35,27 @@ protected:
     TSubclassOf<UUserWidget> DepthWidgetClass;
 
     UPROPERTY(Transient)
-    UUserWidget* SceneDepthWidget = nullptr;
+    TObjectPtr<UUserWidget> SceneDepthWidget = nullptr;
 
     // ================= Rendering =================
     UPROPERTY(EditAnywhere, Category="Rendering")
-    UTextureRenderTarget2D* CameraRenderTarget = nullptr;
+    TObjectPtr<UTextureRenderTarget2D> CameraRenderTarget = nullptr;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Rendering")
-    UPoseDetectionComponent* PoseDetectionComponent = nullptr;
+    TObjectPtr<UPoseDetectionComponent> PoseDetectionComponent = nullptr;
 
     // ================= Materiali =================
     UPROPERTY(EditAnywhere, Category="Rendering")
-    UMaterialInterface* DepthMaterialBase = nullptr;
+    TObjectPtr<UMaterialInterface> DepthMaterialBase = nullptr;
 
     UPROPERTY(EditAnywhere, Category="Rendering")
-    UMaterialInterface* CameraMaterialBase = nullptr;
+    TObjectPtr<UMaterialInterface> CameraMaterialBase = nullptr;
 
     UPROPERTY(Transient)
-    UMaterialInstanceDynamic* DepthMaterial = nullptr;
+    TObjectPtr<UMaterialInstanceDynamic> DepthMaterial = nullptr;
 
     UPROPERTY(Transient)
-    UMaterialInstanceDynamic* CameraMaterial = nullptr;
+    TObjectPtr<UMaterialInstanceDynamic> CameraMaterial = nullptr;
 
     UPROPERTY(EditAnywhere, Category="Rendering")
     FName DepthTextureParameterName = TEXT("DepthParam");
@@ -65,7 +65,7 @@ protected:
 
     // ================= Joint Overlay =================
     UPROPERTY(EditAnywhere, Category="Overlay")
-    UMaterialInterface* JointDotMaterial = nullptr;
+    TObjectPtr<UMaterialInterface> JointDotMaterial = nullptr;
 
     UPROPERTY(EditAnywhere, Category="Overlay")
     FLinearColor JointTextColor = FLinearColor::Yellow;
@@ -89,9 +89,27 @@ protected:
     bool bDrawJointLabels = true;
 
     UPROPERTY(EditAnywhere, Category="Overlay")
-    UFont* JointFont = nullptr;
+    TObjectPtr<UFont> JointFont = nullptr;
+
+    // ================= Depth Debug =================
+    UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
+    bool bLogThoraxDepthMean = true;
+
+    UPROPERTY(EditAnywhere, Category="Pose|DepthDebug", meta=(ClampMin="0.05", ClampMax="5.0"))
+    float ThoraxDepthLogIntervalSeconds = 0.25f;
+
+    UPROPERTY(EditAnywhere, Category="Pose|DepthDebug", meta=(ClampMin="1", ClampMax="128"))
+    int32 ThoraxDepthSampleRadiusPixels = 18;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UTextureRenderTarget2D> DepthDebugRenderTarget = nullptr;
+
+    float TimeSinceThoraxDepthLog = 0.0f;
 
 private:
     void PushDepthMaterialToWidget();
     FVector2D ToScreenSpace(float X, float Y) const;
+    void DrawJointsOverlay();
+    bool TryGetThoraxDepthUV(const TArray<FPoseJoint>& Joints, FVector2D& OutUV) const;
+    bool ComputeDepthMeanAtUV(const FVector2D& UV, float& OutMeanDepth01, int32& OutSampleCount);
 };

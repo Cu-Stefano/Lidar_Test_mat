@@ -34,13 +34,13 @@ public:
         bool bLogPoseInputStats = true;
         
         UPROPERTY(BlueprintReadOnly, Category="Pose")
-        UBodyPoseManager* BodyPoseManager;
+        TObjectPtr<UBodyPoseManager> BodyPoseManager = nullptr;
 
         UFUNCTION(BlueprintCallable, Category="AR")
         void SetRenderTarget(UTextureRenderTarget2D* InRenderTarget);
         
         UPROPERTY(EditAnywhere, BlueprintReadWrite)
-        UTextureRenderTarget2D* RenderTarget;
+        TObjectPtr<UTextureRenderTarget2D> RenderTarget = nullptr;
         
         UFUNCTION(BlueprintCallable, Category="AR")
         virtual void PerformPoseDetectionOnFrame() const;

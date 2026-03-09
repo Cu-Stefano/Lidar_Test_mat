@@ -8,6 +8,14 @@
 #include <Vision/Vision.h>
 #endif
 
+#define POSE_VISION_LOGS 0
+
+#if POSE_VISION_LOGS
+#define VISION_LOG(...) NSLog(__VA_ARGS__)
+#else
+#define VISION_LOG(...) do {} while (0)
+#endif
+
 void DetectHumanPoseFromRGBA_Debug()
 {
     //DetectHumanPoseFromRGBA(IMAGE_DATA, IMAGE_WIDTH, IMAGE_HEIGHT);
@@ -53,7 +61,7 @@ TArray<FPoseJoint> DetectHumanPoseFromRGBA(const uint8_t* RGBAData, int Width, i
 
         if (!cgImage)
         {
-            NSLog(@"[Vision] Failed to create CGImage");
+            VISION_LOG(@"[Vision] Failed to create CGImage");
             return TArray<FPoseJoint>();
         }
 
@@ -70,21 +78,21 @@ TArray<FPoseJoint> DetectHumanPoseFromRGBA(const uint8_t* RGBAData, int Width, i
 
         if (error)
         {
-            NSLog(@"[Vision] Pose detection failed: %@", error.localizedDescription);
+            VISION_LOG(@"[Vision] Pose detection failed: %@", error.localizedDescription);
             return TArray<FPoseJoint>();
         }
         
-        NSLog(@"[Vision] results count %lu", (unsigned long)request.results.count);
+        VISION_LOG(@"[Vision] results count %lu", (unsigned long)request.results.count);
 
         if (request.results.count == 0)
         {
-            NSLog(@"[Vision] No human detected");
+            VISION_LOG(@"[Vision] No human detected");
             return TArray<FPoseJoint>();
         }
 
         for (VNHumanBodyPoseObservation *obs in request.results)
         {
-            NSLog(@"[Vision DEBUG] Found VNHumanBodyPoseObservation: %@", obs);
+            VISION_LOG(@"[Vision DEBUG] Found VNHumanBodyPoseObservation: %@", obs);
             NSError *pointsError = nil;
 
             NSDictionary<NSString *, VNRecognizedPoint *> *points =
@@ -94,17 +102,17 @@ TArray<FPoseJoint> DetectHumanPoseFromRGBA(const uint8_t* RGBAData, int Width, i
 
             if (pointsError)
             {
-                NSLog(@"[Vision] Points error: %@", pointsError.localizedDescription);
+                VISION_LOG(@"[Vision] Points error: %@", pointsError.localizedDescription);
                 continue;
             }
             
             if (!points || points.count == 0)
             {
-                NSLog(@"[Vision DEBUG] Points dictionary is empty!");
+                VISION_LOG(@"[Vision DEBUG] Points dictionary is empty!");
                 continue;
             }
             
-            NSLog(@"[Vision DEBUG] Total joints detected: %lu", (unsigned long)points.count);
+            VISION_LOG(@"[Vision DEBUG] Total joints detected: %lu", (unsigned long)points.count);
 
             NSUInteger jointIndex = 0;
             for (NSString *jointName in points)
@@ -113,11 +121,12 @@ TArray<FPoseJoint> DetectHumanPoseFromRGBA(const uint8_t* RGBAData, int Width, i
                 
                 if (!p)
                 {
-                    NSLog(@"[Vision DEBUG] Joint %@ is nil!", jointName);
+                    VISION_LOG(@"[Vision DEBUG] Joint %@ is nil!", jointName);
                     continue;
                 }
                 
                 FPoseJoint joint;
+                joint.Name = UTF8_TO_TCHAR([jointName UTF8String]);
                 joint.X = p.x;
                 joint.Y = p.y;
                 joint.Confidence = p.confidence;
