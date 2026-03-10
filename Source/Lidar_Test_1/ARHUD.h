@@ -25,6 +25,9 @@ class LIDAR_TEST_1_API AARHUD : public AHUD
 public:
     AARHUD();
 
+    UFUNCTION(BlueprintCallable, Category="UI|DepthGraph")
+    void GetThoraxDepthHistory(TArray<int32>& OutHistoryMillimeters, int32& OutLatestDepthMillimeters, bool& bOutHasDepth) const;
+
 protected:
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaSeconds) override;
@@ -37,6 +40,15 @@ protected:
 
     UPROPERTY(Transient)
     TObjectPtr<UUserWidget> SceneDepthWidget = nullptr;
+
+    UPROPERTY(EditDefaultsOnly, Category="UI")
+    TSubclassOf<UUserWidget> DebugPanelClass;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UUserWidget> DebugPanelWidget = nullptr;
+
+    UPROPERTY(EditAnywhere, Category="UI|DebugPanel")
+    bool bShowDebugPanel = true;
 
     UPROPERTY(EditAnywhere, Category="UI|DepthToggle")
     bool bShowDepthOverlay = false;
@@ -57,7 +69,7 @@ protected:
     FLinearColor DepthToggleButtonOffColor = FLinearColor(0.15f, 0.15f, 0.15f, 0.90f);
 
     UPROPERTY(EditAnywhere, Category="UI|DepthReadout")
-    bool bShowThoraxDepthReadout = true;
+    bool bShowThoraxDepthReadout = false;
 
     UPROPERTY(EditAnywhere, Category="UI|DepthReadout")
     FVector2D ThoraxDepthReadoutPosition = FVector2D(24.0f, 84.0f);
@@ -168,13 +180,31 @@ protected:
     UPROPERTY(Transient)
     bool bHasThoraxDepthReading = false;
 
+    UPROPERTY(EditAnywhere, Category="UI|DepthGraph", meta=(ClampMin="8", ClampMax="512"))
+    int32 ThoraxDepthHistoryMaxSamples = 120;
+
+    UPROPERTY(EditAnywhere, Category="UI|DepthGraph")
+    FName DebugPanelDepthUpdateFunctionName = TEXT("UpdateThoraxDepthGraph");
+
+    UPROPERTY(EditAnywhere, Category="UI|DepthGraph")
+    bool bEnableThoraxDepthGraphUpdates = true;
+
+    UPROPERTY(Transient)
+    TArray<int32> ThoraxDepthHistoryMillimeters;
+
+    UPROPERTY(Transient)
+    bool bLoggedMissingDepthGraphFunction = false;
+
 private:
     void PushMaterialToWidget(UMaterialInterface* Material);
     void UpdateDepthWidgetState();
+    void UpdateDebugPanelState();
     void DrawDepthToggleButton();
     void DrawThoraxDepthReadout();
     FVector2D ToScreenSpace(float X, float Y) const;
     void DrawJointsOverlay();
+    void RecordThoraxDepthSample(int32 DepthMillimeters);
+    void PushThoraxDepthToDebugPanel();
     bool TryGetThoraxDepthUV(const TArray<FPoseJoint>& Joints, FVector2D& OutUV) const;
     bool ComputeDepthMeanAtUV(
         const FVector2D& UV,

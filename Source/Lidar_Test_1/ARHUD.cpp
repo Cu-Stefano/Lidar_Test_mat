@@ -37,6 +37,7 @@ const TMap<FString, EThoraxJointRole>& GetThoraxJointRoleDictionary()
         {TEXT("left_shoulder_1_joint"), EThoraxJointRole::LeftShoulder},
         {TEXT("right_shoulder_1_joint"), EThoraxJointRole::RightShoulder},
         {TEXT("left_upleg_joint"), EThoraxJointRole::LeftHip},
+        {TEXT("left_upleg_joint"), EThoraxJointRole::LeftHip},
         {TEXT("right_upleg_joint"), EThoraxJointRole::RightHip},
 
         // Compatibility aliases.
@@ -85,6 +86,21 @@ AARHUD::AARHUD()
         else
         {
             UE_LOG(LogTemp, Warning, TEXT("AARHUD: cannot load widget class /Game/Widget/UI_DepthShower"));
+        }
+    }
+
+    if (!DebugPanelClass)
+    {
+        static ConstructorHelpers::FClassFinder<UUserWidget> DebugPanelClassFinder(
+            TEXT("/Game/Widget/WBP_DebugPanel")
+        );
+        if (DebugPanelClassFinder.Succeeded())
+        {
+            DebugPanelClass = DebugPanelClassFinder.Class;
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("AARHUD: cannot load widget class /Game/Widget/WBP_DebugPanel"));
         }
     }
 
@@ -174,8 +190,35 @@ void AARHUD::BeginPlay()
         CameraMaterial = UMaterialInstanceDynamic::Create(CameraMaterialBase, this);
     }
 
-    UpdateDepthWidgetState();
+    if (DebugPanelClass && PC)
+    {
+        DebugPanelWidget = CreateWidget<UUserWidget>(PC, DebugPanelClass);
+        if (DebugPanelWidget)
+        {
+            DebugPanelWidget->AddToViewport(1000);
+            UE_LOG(LogTemp, Log, TEXT("AARHUD: DebugPanel created and added to viewport (Z=1000)"));
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("AARHUD: DebugPanel create failed"));
+        }
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("AARHUD: DebugPanel skipped (class or player controller missing)"));
+    }
 
+    UpdateDepthWidgetState();
+    UpdateDebugPanelState();
+    PushThoraxDepthToDebugPanel();
+
+}
+
+void AARHUD::GetThoraxDepthHistory(TArray<int32>& OutHistoryMillimeters, int32& OutLatestDepthMillimeters, bool& bOutHasDepth) const
+{
+    OutHistoryMillimeters = ThoraxDepthHistoryMillimeters;
+    OutLatestDepthMillimeters = LastThoraxDepthMillimeters;
+    bOutHasDepth = bHasThoraxDepthReading;
 }
 
 void AARHUD::Tick(float DeltaSeconds)
@@ -215,7 +258,7 @@ void AARHUD::Tick(float DeltaSeconds)
         PoseDetectionComponent->PerformPoseDetectionOnFrame();
     }
 
-    if (!bLogThoraxDepthMean && !bShowThoraxDepthReadout)
+    if (!bLogThoraxDepthMean && !bShowThoraxDepthReadout && !bEnableThoraxDepthGraphUpdates)
     {
         return;
     }
@@ -273,6 +316,8 @@ void AARHUD::Tick(float DeltaSeconds)
 
     LastThoraxDepthMillimeters = MeanDepthMillimeters;
     bHasThoraxDepthReading = true;
+    RecordThoraxDepthSample(MeanDepthMillimeters);
+    PushThoraxDepthToDebugPanel();
 
     if (!bLogThoraxDepthMean)
     {
@@ -693,6 +738,18 @@ void AARHUD::UpdateDepthWidgetState()
     SceneDepthWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 }
 
+void AARHUD::UpdateDebugPanelState()
+{
+    if (!DebugPanelWidget)
+    {
+        return;
+    }
+
+    DebugPanelWidget->SetVisibility(
+        bShowDebugPanel ? ESlateVisibility::Visible : ESlateVisibility::Collapsed
+    );
+}
+
 void AARHUD::DrawDepthToggleButton()
 {
     if (!Canvas || !bShowDepthToggleButton)
@@ -749,6 +806,76 @@ void AARHUD::DrawThoraxDepthReadout()
         ThoraxDepthReadoutScale,
         false
     );
+}
+
+void AARHUD::RecordThoraxDepthSample(const int32 DepthMillimeters)
+{
+    ThoraxDepthHistoryMillimeters.Add(DepthMillimeters);
+
+    const int32 MaxSamples = FMath::Max(1, ThoraxDepthHistoryMaxSamples);
+    if (ThoraxDepthHistoryMillimeters.Num() > MaxSamples)
+    {
+        const int32 SamplesToTrim = ThoraxDepthHistoryMillimeters.Num() - MaxSamples;
+        ThoraxDepthHistoryMillimeters.RemoveAt(0, SamplesToTrim, EAllowShrinking::No);
+    }
+}
+
+void AARHUD::PushThoraxDepthToDebugPanel()
+{
+    if (!DebugPanelWidget || DebugPanelDepthUpdateFunctionName.IsNone())
+    {
+        return;
+    }
+
+    UFunction* UpdateFunction = DebugPanelWidget->FindFunction(DebugPanelDepthUpdateFunctionName);
+    if (!UpdateFunction)
+    {
+        if (!bLoggedMissingDepthGraphFunction)
+        {
+            UE_LOG(
+                LogTemp,
+                Warning,
+                TEXT("AARHUD: Debug panel function '%s' not found. Add it in WBP_DebugPanel to receive depth graph updates."),
+                *DebugPanelDepthUpdateFunctionName.ToString()
+            );
+            bLoggedMissingDepthGraphFunction = true;
+        }
+        return;
+    }
+
+    bLoggedMissingDepthGraphFunction = false;
+
+    struct FUpdateThoraxDepthGraphParams
+    {
+        TArray<int32> DepthHistoryMillimeters;
+        int32 CurrentDepthMillimeters = 0;
+        bool bHasDepth = false;
+    };
+
+    FUpdateThoraxDepthGraphParams Params;
+    Params.DepthHistoryMillimeters = ThoraxDepthHistoryMillimeters;
+    Params.CurrentDepthMillimeters = LastThoraxDepthMillimeters;
+    Params.bHasDepth = bHasThoraxDepthReading;
+
+    {
+        static double LastGraphPushLogSeconds = 0.0;
+        const double NowSeconds = FPlatformTime::Seconds();
+        if (NowSeconds - LastGraphPushLogSeconds > 1.0)
+        {
+            UE_LOG(
+                LogTemp,
+                Log,
+                TEXT("AARHUD: PushThoraxDepthToDebugPanel -> history=%d current=%d hasDepth=%s targetFn=%s"),
+                Params.DepthHistoryMillimeters.Num(),
+                Params.CurrentDepthMillimeters,
+                Params.bHasDepth ? TEXT("true") : TEXT("false"),
+                *DebugPanelDepthUpdateFunctionName.ToString()
+            );
+            LastGraphPushLogSeconds = NowSeconds;
+        }
+    }
+
+    DebugPanelWidget->ProcessEvent(UpdateFunction, &Params);
 }
 
 FVector2D AARHUD::ToScreenSpace(float X, float Y) const
