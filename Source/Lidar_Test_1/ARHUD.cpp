@@ -16,6 +16,8 @@
 
 namespace
 {
+const FName DepthToggleHitBoxName(TEXT("DepthToggleHitBox"));
+
 enum class EThoraxJointRole : uint8
 {
     Unknown,
@@ -147,8 +149,15 @@ void AARHUD::BeginPlay()
 {
     Super::BeginPlay();
 
-    // Depth widget intentionally disabled: keep depth processing without showing UI overlay.
-    SceneDepthWidget = nullptr;
+    TObjectPtr<APlayerController> PC = GetOwningPlayerController();
+    if (DepthWidgetClass && PC)
+    {
+        SceneDepthWidget = CreateWidget<UUserWidget>(PC, DepthWidgetClass);
+        if (SceneDepthWidget)
+        {
+            SceneDepthWidget->AddToViewport();
+        }
+    }
 
     if (DepthMaterialBase)
     {
@@ -165,6 +174,8 @@ void AARHUD::BeginPlay()
         CameraMaterial = UMaterialInstanceDynamic::Create(CameraMaterialBase, this);
     }
 
+    UpdateDepthWidgetState();
+
 }
 
 void AARHUD::Tick(float DeltaSeconds)
@@ -173,15 +184,21 @@ void AARHUD::Tick(float DeltaSeconds)
 
     if (DepthMaterial)
     {
-        if (UARTexture* DepthTexture = UARBlueprintLibrary::GetARTexture(EARTextureType::SceneDepthMap))
+        if (TObjectPtr<UARTexture> DepthTexture = UARBlueprintLibrary::GetARTexture(EARTextureType::SceneDepthMap))
         {
             DepthMaterial->SetTextureParameterValue(DepthTextureParameterName, DepthTexture);
+            DepthMaterial->SetScalarParameterValue(DepthNearMetersParameterName, DepthNearMeters);
+            DepthMaterial->SetScalarParameterValue(DepthFarMetersParameterName, FMath::Max(DepthNearMeters + KINDA_SMALL_NUMBER, DepthFarMeters));
+            if (bShowDepthOverlay)
+            {
+                UpdateDepthWidgetState();
+            }
         }
     }
 
     if (CameraMaterial)
     {
-        if (UARTexture* CameraTexture = UARBlueprintLibrary::GetARTexture(EARTextureType::CameraImage))
+        if (TObjectPtr<UARTexture> CameraTexture = UARBlueprintLibrary::GetARTexture(EARTextureType::CameraImage))
         {
             CameraMaterial->SetTextureParameterValue(CameraTextureParameterName, CameraTexture);
         }
@@ -198,7 +215,7 @@ void AARHUD::Tick(float DeltaSeconds)
         PoseDetectionComponent->PerformPoseDetectionOnFrame();
     }
 
-    if (!bLogThoraxDepthMean)
+    if (!bLogThoraxDepthMean && !bShowThoraxDepthReadout)
     {
         return;
     }
@@ -212,6 +229,7 @@ void AARHUD::Tick(float DeltaSeconds)
 
     if (!PoseDetectionComponent || !PoseDetectionComponent->BodyPoseManager)
     {
+        bHasThoraxDepthReading = false;
         return;
     }
 
@@ -219,32 +237,124 @@ void AARHUD::Tick(float DeltaSeconds)
     FVector2D ThoraxUV = FVector2D::ZeroVector;
     if (!TryGetThoraxDepthUV(Joints, ThoraxUV))
     {
+        bHasThoraxDepthReading = false;
         UE_LOG(LogTemp, Warning, TEXT("Thorax depth mean skipped: no reliable thorax/chest joints"));
         return;
     }
 
-    float MeanDepthRaw = 0.0f;
+    float MeanDepthValue = 0.0f;
+    float MinDepthValue = 0.0f;
+    float MaxDepthValue = 0.0f;
     int32 SampleCount = 0;
-    if (!ComputeDepthMeanAtUV(ThoraxUV, MeanDepthRaw, SampleCount))
+    if (!ComputeDepthMeanAtUV(ThoraxUV, MeanDepthValue, SampleCount, &MinDepthValue, &MaxDepthValue))
     {
+        bHasThoraxDepthReading = false;
         UE_LOG(LogTemp, Warning, TEXT("Thorax depth mean skipped: cannot sample depth texture"));
         return;
     }
 
-    UE_LOG(
-        LogTemp,
-        Log,
-        TEXT("Thorax depth mean: %.2f (raw 0..255), samples=%d, uv=(%.3f, %.3f)"),
-        MeanDepthRaw,
-        SampleCount,
-        ThoraxUV.X,
-        ThoraxUV.Y
-    );
+    const float SafeFarMeters = FMath::Max(DepthNearMeters + KINDA_SMALL_NUMBER, DepthFarMeters);
+    const auto MaterialValueToMeters = [this, SafeFarMeters](const float DepthValue) -> float
+    {
+        if (bDepthMaterialValuesAreNormalized)
+        {
+            return FMath::Lerp(DepthNearMeters, SafeFarMeters, FMath::Clamp(DepthValue, 0.0f, 1.0f));
+        }
+
+        return FMath::Max(0.0f, DepthValue);
+    };
+
+    const float MeanDepthMeters = MaterialValueToMeters(MeanDepthValue);
+    const float MinDepthMeters = MaterialValueToMeters(MinDepthValue);
+    const float MaxDepthMeters = MaterialValueToMeters(MaxDepthValue);
+    const int32 MeanDepthMillimeters = FMath::RoundToInt(MeanDepthMeters * 1000.0f);
+    const int32 MinDepthMillimeters = FMath::RoundToInt(MinDepthMeters * 1000.0f);
+    const int32 MaxDepthMillimeters = FMath::RoundToInt(MaxDepthMeters * 1000.0f);
+
+    LastThoraxDepthMillimeters = MeanDepthMillimeters;
+    bHasThoraxDepthReading = true;
+
+    if (!bLogThoraxDepthMean)
+    {
+        return;
+    }
+
+    if (bLogThoraxDepthMinMax)
+    {
+        if (bLogThoraxDepthInMillimeters)
+        {
+            UE_LOG(
+                LogTemp,
+                Log,
+                TEXT("Thorax depth mean: %d mm (%.3f m), min: %d mm, max: %d mm, samples=%d, uv=(%.3f, %.3f), normalized=%s, vizNear=%.2fm, vizFar=%.2fm"),
+                MeanDepthMillimeters,
+                MeanDepthMeters,
+                MinDepthMillimeters,
+                MaxDepthMillimeters,
+                SampleCount,
+                ThoraxUV.X,
+                ThoraxUV.Y,
+                bDepthMaterialValuesAreNormalized ? TEXT("true") : TEXT("false"),
+                DepthNearMeters,
+                SafeFarMeters
+            );
+        }
+        else
+        {
+            UE_LOG(
+                LogTemp,
+                Log,
+                TEXT("Thorax depth mean: %.3f m, min: %.3f m, max: %.3f m, samples=%d, uv=(%.3f, %.3f), normalized=%s, vizNear=%.2fm, vizFar=%.2fm"),
+                MeanDepthMeters,
+                MinDepthMeters,
+                MaxDepthMeters,
+                SampleCount,
+                ThoraxUV.X,
+                ThoraxUV.Y,
+                bDepthMaterialValuesAreNormalized ? TEXT("true") : TEXT("false"),
+                DepthNearMeters,
+                SafeFarMeters
+            );
+        }
+    }
+    else
+    {
+        if (bLogThoraxDepthInMillimeters)
+        {
+            UE_LOG(
+                LogTemp,
+                Log,
+                TEXT("Thorax depth mean: %d mm (%.3f m), samples=%d, uv=(%.3f, %.3f), normalized=%s"),
+                MeanDepthMillimeters,
+                MeanDepthMeters,
+                SampleCount,
+                ThoraxUV.X,
+                ThoraxUV.Y,
+                bDepthMaterialValuesAreNormalized ? TEXT("true") : TEXT("false")
+            );
+        }
+        else
+        {
+            UE_LOG(
+                LogTemp,
+                Log,
+                TEXT("Thorax depth mean: %.3f m, samples=%d, uv=(%.3f, %.3f), normalized=%s"),
+                MeanDepthMeters,
+                SampleCount,
+                ThoraxUV.X,
+                ThoraxUV.Y,
+                bDepthMaterialValuesAreNormalized ? TEXT("true") : TEXT("false")
+            );
+        }
+    }
 }
 
 void AARHUD::DrawHUD()
 {
     Super::DrawHUD();
+
+    DrawDepthToggleButton();
+    DrawThoraxDepthReadout();
 
     if (!Canvas || !PoseDetectionComponent || !PoseDetectionComponent->BodyPoseManager)
     {
@@ -253,6 +363,17 @@ void AARHUD::DrawHUD()
 
     DrawJointsOverlay();
 
+}
+
+void AARHUD::NotifyHitBoxClick(FName BoxName)
+{
+    Super::NotifyHitBoxClick(BoxName);
+
+    if (BoxName == DepthToggleHitBoxName)
+    {
+        bShowDepthOverlay = !bShowDepthOverlay;
+        UpdateDepthWidgetState();
+    }
 }
 
 void AARHUD::DrawJointsOverlay()
@@ -412,7 +533,13 @@ bool AARHUD::TryGetThoraxDepthUV(const TArray<FPoseJoint>& Joints, FVector2D& Ou
     return true;
 }
 
-bool AARHUD::ComputeDepthMeanAtUV(const FVector2D& UV, float& OutMeanDepthRaw, int32& OutSampleCount)
+bool AARHUD::ComputeDepthMeanAtUV(
+    const FVector2D& UV,
+    float& OutMeanDepthValue,
+    int32& OutSampleCount,
+    float* OutMinDepthValue,
+    float* OutMaxDepthValue
+)
 {
     if (!DepthMaterial)
     {
@@ -430,12 +557,24 @@ bool AARHUD::ComputeDepthMeanAtUV(const FVector2D& UV, float& OutMeanDepthRaw, i
 
     if (!DepthDebugRenderTarget || DepthDebugRenderTarget->SizeX != DepthRTWidth || DepthDebugRenderTarget->SizeY != DepthRTHeight)
     {
+        ETextureRenderTargetFormat DepthRTFormat;
+        
+        DepthRTFormat = bUseFloat32DepthSampling
+            ? ETextureRenderTargetFormat::RTF_RGBA32f
+            : ETextureRenderTargetFormat::RTF_RGBA16f;
+        
         DepthDebugRenderTarget = UKismetRenderingLibrary::CreateRenderTarget2D(
             this,
             DepthRTWidth,
             DepthRTHeight,
-            ETextureRenderTargetFormat::RTF_RGBA8
+            DepthRTFormat
         );
+
+        if (DepthDebugRenderTarget)
+        {
+            DepthDebugRenderTarget->bForceLinearGamma = true;
+            DepthDebugRenderTarget->UpdateResourceImmediate(false);
+        }
     }
 
     if (!DepthDebugRenderTarget)
@@ -451,8 +590,10 @@ bool AARHUD::ComputeDepthMeanAtUV(const FVector2D& UV, float& OutMeanDepthRaw, i
         return false;
     }
 
-    TArray<FColor> PixelData;
-    if (!RTResource->ReadPixels(PixelData) || PixelData.Num() == 0)
+    TArray<FLinearColor> PixelData;
+    FReadSurfaceDataFlags ReadFlags;
+    ReadFlags.SetLinearToGamma(false);
+    if (!RTResource->ReadLinearColorPixels(PixelData, ReadFlags) || PixelData.Num() == 0)
     {
         return false;
     }
@@ -466,6 +607,8 @@ bool AARHUD::ComputeDepthMeanAtUV(const FVector2D& UV, float& OutMeanDepthRaw, i
 
     double DepthSum = 0.0;
     int32 Count = 0;
+    float MinDepth = TNumericLimits<float>::Max();
+    float MaxDepth = TNumericLimits<float>::Lowest();
 
     for (int32 Y = FMath::Max(0, CenterY - Radius); Y <= FMath::Min(Height - 1, CenterY + Radius); ++Y)
     {
@@ -478,10 +621,11 @@ bool AARHUD::ComputeDepthMeanAtUV(const FVector2D& UV, float& OutMeanDepthRaw, i
                 continue;
             }
 
-            const FColor& Pixel = PixelData[Y * Width + X];
-            const float PixelDepthRaw = static_cast<float>(Pixel.R);
-
-            DepthSum += PixelDepthRaw;
+            const FLinearColor& Pixel = PixelData[Y * Width + X];
+            const float PixelDepth = Pixel.R;
+            DepthSum += static_cast<double>(PixelDepth);
+            MinDepth = FMath::Min(MinDepth, PixelDepth);
+            MaxDepth = FMath::Max(MaxDepth, PixelDepth);
             ++Count;
         }
     }
@@ -492,19 +636,27 @@ bool AARHUD::ComputeDepthMeanAtUV(const FVector2D& UV, float& OutMeanDepthRaw, i
     }
 
     OutSampleCount = Count;
-    OutMeanDepthRaw = static_cast<float>(DepthSum / static_cast<double>(Count));
+    OutMeanDepthValue = static_cast<float>(DepthSum / static_cast<double>(Count));
+    if (OutMinDepthValue)
+    {
+        *OutMinDepthValue = MinDepth;
+    }
+    if (OutMaxDepthValue)
+    {
+        *OutMaxDepthValue = MaxDepth;
+    }
 
     return true;
 }
 
-void AARHUD::PushDepthMaterialToWidget()
+void AARHUD::PushMaterialToWidget(UMaterialInterface* Material)
 {
-    if (!SceneDepthWidget || !DepthMaterial)
+    if (!SceneDepthWidget || !Material)
     {
         return;
     }
 
-    UFunction* SetImageMaterialFunction = SceneDepthWidget->FindFunction(TEXT("SetImageMaterial"));
+    TObjectPtr<UFunction> SetImageMaterialFunction = SceneDepthWidget->FindFunction(TEXT("SetImageMaterial"));
     if (!SetImageMaterialFunction)
     {
         return;
@@ -516,8 +668,87 @@ void AARHUD::PushDepthMaterialToWidget()
     };
 
     FSetImageMaterialParams Params;
-    Params.Material = DepthMaterial;
+    Params.Material = Material;
     SceneDepthWidget->ProcessEvent(SetImageMaterialFunction, &Params);
+}
+
+void AARHUD::UpdateDepthWidgetState()
+{
+    if (!SceneDepthWidget)
+    {
+        return;
+    }
+
+    if (!bShowDepthOverlay)
+    {
+        SceneDepthWidget->SetVisibility(ESlateVisibility::Collapsed);
+        return;
+    }
+
+    if (DepthMaterial)
+    {
+        PushMaterialToWidget(DepthMaterial);
+    }
+
+    SceneDepthWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+}
+
+void AARHUD::DrawDepthToggleButton()
+{
+    if (!Canvas || !bShowDepthToggleButton)
+    {
+        return;
+    }
+
+    const FLinearColor FillColor = bShowDepthOverlay ? DepthToggleButtonOnColor : DepthToggleButtonOffColor;
+    DrawRect(
+        FillColor,
+        DepthToggleButtonPosition.X,
+        DepthToggleButtonPosition.Y,
+        DepthToggleButtonSize.X,
+        DepthToggleButtonSize.Y
+    );
+
+    const FString Label = bShowDepthOverlay ? TEXT("Depth: ON") : TEXT("Depth: OFF");
+    DrawText(
+        Label,
+        FLinearColor::White,
+        DepthToggleButtonPosition.X + 12.0f,
+        DepthToggleButtonPosition.Y + 12.0f,
+        JointFont,
+        0.9f,
+        false
+    );
+
+    AddHitBox(
+        DepthToggleButtonPosition,
+        DepthToggleButtonSize,
+        DepthToggleHitBoxName,
+        true,
+        0
+    );
+}
+
+void AARHUD::DrawThoraxDepthReadout()
+{
+    if (!Canvas || !bShowThoraxDepthReadout)
+    {
+        return;
+    }
+
+    const FString ReadoutText = bHasThoraxDepthReading
+        ? FString::Printf(TEXT("Thorax depth: %d mm"), LastThoraxDepthMillimeters)
+        : TEXT("Thorax depth: -- mm");
+
+    DrawText(
+        ReadoutText,
+        ThoraxDepthReadoutColor,
+        ThoraxDepthReadoutPosition.X,
+        ThoraxDepthReadoutPosition.Y,
+        JointFont,
+        ThoraxDepthReadoutScale,
+        false
+    );
 }
 
 FVector2D AARHUD::ToScreenSpace(float X, float Y) const
