@@ -264,10 +264,6 @@ void AARHUD::Tick(float DeltaSeconds)
     }
 
     TimeSinceThoraxDepthLog += DeltaSeconds;
-    if (TimeSinceThoraxDepthLog < ThoraxDepthLogIntervalSeconds)
-    {
-        return;
-    }
     TimeSinceThoraxDepthLog = 0.0f;
 
     if (!PoseDetectionComponent || !PoseDetectionComponent->BodyPoseManager)

@@ -3,6 +3,7 @@
 
 #include "UDepthGraphWidget.h"
 
+#include "Fonts/SlateFontInfo.h"
 #include "Rendering/DrawElements.h"
 #include "Styling/CoreStyle.h"
 
@@ -90,7 +91,10 @@ int32 UUDepthGraphWidget::NativePaint(
 	}
 
 	const FSlateBrush* WhiteBrush = FCoreStyle::Get().GetBrush(TEXT("WhiteBrush"));
-	FPaintGeometry FullPaintGeometry = AllottedGeometry.ToPaintGeometry();
+	const FPaintGeometry FullPaintGeometry = AllottedGeometry.ToPaintGeometry(
+		FVector2f(static_cast<float>(WidgetSize.X), static_cast<float>(WidgetSize.Y)),
+		FSlateLayoutTransform()
+	);
 
 	FSlateDrawElement::MakeBox(
 		OutDrawElements,
@@ -107,7 +111,7 @@ int32 UUDepthGraphWidget::NativePaint(
 		FSlateDrawElement::MakeLines(
 			OutDrawElements,
 			BaseLayer + 2,
-			AllottedGeometry.ToPaintGeometry(),
+			FullPaintGeometry,
 			{
 				FVector2D(1.0f, 1.0f),
 				FVector2D(1.0f + BorderSize.X, 1.0f),
@@ -140,7 +144,9 @@ int32 UUDepthGraphWidget::NativePaint(
 		return BaseLayer + 2;
 	}
 
-	const float Left = GraphPadding.Left;
+	const float YAxisLabelAreaWidth = 52.0f;
+	const float YAxisTickLength = 5.0f;
+	const float Left = GraphPadding.Left + YAxisLabelAreaWidth;
 	const float Top = GraphPadding.Top;
 	const float Right = WidgetSize.X - GraphPadding.Right;
 	const float Bottom = WidgetSize.Y - GraphPadding.Bottom;
@@ -190,6 +196,55 @@ int32 UUDepthGraphWidget::NativePaint(
 		MaxDepth = MinDepth + 1;
 	}
 
+	const int32 MidDepth = (MinDepth + MaxDepth) / 2;
+	const FSlateFontInfo AxisFontInfo = FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 10);
+	const FLinearColor AxisLabelColor(0.88f, 0.88f, 0.88f, 0.95f);
+	const FLinearColor AxisGuideColor(0.35f, 0.35f, 0.35f, 0.50f);
+
+	const float AxisTextX = GraphPadding.Left;
+	const float AxisTickStartX = Left - YAxisTickLength;
+
+	const auto DrawYAxisLabel = [&](const int32 Layer, const float Y, const int32 DepthMm)
+	{
+		const FString Label = FString::Printf(TEXT("%d"), DepthMm);
+		const FVector2f LabelPosition(
+			static_cast<float>(AxisTextX),
+			static_cast<float>(Y - 7.0f)
+		);
+
+		FSlateDrawElement::MakeText(
+			OutDrawElements,
+			Layer,
+			AllottedGeometry.ToPaintGeometry(
+				FVector2f(static_cast<float>(WidgetSize.X), static_cast<float>(WidgetSize.Y)),
+				FSlateLayoutTransform(LabelPosition)
+			),
+			Label,
+			AxisFontInfo,
+			ESlateDrawEffect::None,
+			AxisLabelColor
+		);
+
+		FSlateDrawElement::MakeLines(
+			OutDrawElements,
+			Layer,
+			FullPaintGeometry,
+			{
+				FVector2D(AxisTickStartX, Y),
+				FVector2D(Left, Y),
+				FVector2D(Right, Y)
+			},
+			ESlateDrawEffect::None,
+			AxisGuideColor,
+			false,
+			1.0f
+		);
+	};
+
+	DrawYAxisLabel(BaseLayer + 3, Top, MaxDepth);
+	DrawYAxisLabel(BaseLayer + 3, Top + 0.5f * PlotHeight, MidDepth);
+	DrawYAxisLabel(BaseLayer + 3, Bottom, MinDepth);
+
 	TArray<FVector2D> GraphPoints;
 	GraphPoints.Reserve(SamplesToDraw);
 
@@ -214,7 +269,7 @@ int32 UUDepthGraphWidget::NativePaint(
 	FSlateDrawElement::MakeLines(
 		OutDrawElements,
 		BaseLayer + 3,
-		AllottedGeometry.ToPaintGeometry(),
+		FullPaintGeometry,
 		GraphPoints,
 		ESlateDrawEffect::None,
 		LineColor,
@@ -230,7 +285,15 @@ int32 UUDepthGraphWidget::NativePaint(
 		FSlateDrawElement::MakeBox(
 			OutDrawElements,
 			BaseLayer + 4,
-			AllottedGeometry.ToPaintGeometry(MarkerTopLeft, FVector2D(CurrentPointSize, CurrentPointSize)),
+			AllottedGeometry.ToPaintGeometry(
+				FVector2f(CurrentPointSize, CurrentPointSize),
+				FSlateLayoutTransform(
+					FVector2f(
+						static_cast<float>(MarkerTopLeft.X),
+						static_cast<float>(MarkerTopLeft.Y)
+					)
+				)
+			),
 			WhiteBrush,
 			ESlateDrawEffect::None,
 			CurrentPointColor

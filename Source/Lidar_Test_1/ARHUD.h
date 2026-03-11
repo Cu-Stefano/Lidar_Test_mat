@@ -150,9 +150,6 @@ protected:
     UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
     bool bLogThoraxDepthMean = true;
 
-    UPROPERTY(EditAnywhere, Category="Pose|DepthDebug", meta=(ClampMin="0.05", ClampMax="5.0"))
-    float ThoraxDepthLogIntervalSeconds = 0.25f;
-
     UPROPERTY(EditAnywhere, Category="Pose|DepthDebug", meta=(ClampMin="1", ClampMax="128"))
     int32 ThoraxDepthSampleRadiusPixels = 18;
 
@@ -181,7 +178,7 @@ protected:
     bool bHasThoraxDepthReading = false;
 
     UPROPERTY(EditAnywhere, Category="UI|DepthGraph", meta=(ClampMin="8", ClampMax="512"))
-    int32 ThoraxDepthHistoryMaxSamples = 120;
+    int32 ThoraxDepthHistoryMaxSamples = 500;
 
     UPROPERTY(EditAnywhere, Category="UI|DepthGraph")
     FName DebugPanelDepthUpdateFunctionName = TEXT("UpdateThoraxDepthGraph");
