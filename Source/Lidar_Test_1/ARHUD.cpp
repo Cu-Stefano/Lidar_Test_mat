@@ -10,7 +10,6 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Kismet/KismetRenderingLibrary.h"
-#include "UObject/ConstructorHelpers.h"
 #include "PoseDetectionComponent.h"
 #include "BodyPoseManager.h"
 
@@ -72,98 +71,12 @@ AARHUD::AARHUD()
 {
     PrimaryActorTick.bCanEverTick = true;
     PoseDetectionComponent = CreateDefaultSubobject<UPoseDetectionComponent>(TEXT("PoseDetectionComponent"));
-
-    // Pure C++ setup: auto-assign project assets so BP defaults are optional.
-    if (!DepthWidgetClass)
-    {
-        static ConstructorHelpers::FClassFinder<UUserWidget> DepthWidgetClassFinder(
-            TEXT("/Game/Widget/UI_DepthShower")
-        );
-        if (DepthWidgetClassFinder.Succeeded())
-        {
-            DepthWidgetClass = DepthWidgetClassFinder.Class;
-        }
-        else
-        {
-            UE_LOG(LogTemp, Warning, TEXT("AARHUD: cannot load widget class /Game/Widget/UI_DepthShower"));
-        }
-    }
-
-    if (!DebugPanelClass)
-    {
-        static ConstructorHelpers::FClassFinder<UUserWidget> DebugPanelClassFinder(
-            TEXT("/Game/Widget/WBP_DebugPanel")
-        );
-        if (DebugPanelClassFinder.Succeeded())
-        {
-            DebugPanelClass = DebugPanelClassFinder.Class;
-        }
-        else
-        {
-            UE_LOG(LogTemp, Warning, TEXT("AARHUD: cannot load widget class /Game/Widget/WBP_DebugPanel"));
-        }
-    }
-
-    if (!DepthMaterialBase)
-    {
-        static ConstructorHelpers::FObjectFinder<UMaterialInterface> DepthMaterialFinder(
-            TEXT("/Game/Materials/MT_DepthMaterial.MT_DepthMaterial")
-        );
-        if (DepthMaterialFinder.Succeeded())
-        {
-            DepthMaterialBase = DepthMaterialFinder.Object;
-        }
-        else
-        {
-            UE_LOG(LogTemp, Warning, TEXT("AARHUD: cannot load material /Game/Materials/MT_DepthMaterial"));
-        }
-    }
-
-    if (!CameraMaterialBase)
-    {
-        static ConstructorHelpers::FObjectFinder<UMaterialInterface> CameraMaterialFinder(
-            TEXT("/Game/Materials/MT_Camera.MT_Camera")
-        );
-        if (CameraMaterialFinder.Succeeded())
-        {
-            CameraMaterialBase = CameraMaterialFinder.Object;
-        }
-        else
-        {
-            UE_LOG(LogTemp, Warning, TEXT("AARHUD: cannot load material /Game/Materials/MT_Camera"));
-        }
-    }
-
-    if (!CameraRenderTarget)
-    {
-        static ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> CameraRenderTargetFinder(
-            TEXT("/Game/Materials/RT_Camera.RT_Camera")
-        );
-        if (CameraRenderTargetFinder.Succeeded())
-        {
-            CameraRenderTarget = CameraRenderTargetFinder.Object;
-        }
-        else
-        {
-            UE_LOG(LogTemp, Warning, TEXT("AARHUD: cannot load render target /Game/Materials/RT_Camera"));
-        }
-    }
-
-    if (!JointFont)
-    {
-        static ConstructorHelpers::FObjectFinder<UFont> RobotoFontFinder(
-            TEXT("/Engine/EngineFonts/Roboto.Roboto")
-        );
-        if (RobotoFontFinder.Succeeded())
-        {
-            JointFont = RobotoFontFinder.Object;
-        }
-    }
 }
 
 void AARHUD::BeginPlay()
 {
     Super::BeginPlay();
+    ValidateEditorAssignments();
 
     TObjectPtr<APlayerController> PC = GetOwningPlayerController();
     if (DepthWidgetClass && PC)
@@ -184,7 +97,6 @@ void AARHUD::BeginPlay()
     {
         PoseDetectionComponent->SetRenderTarget(CameraRenderTarget);
     }
-
     if (CameraMaterialBase)
     {
         CameraMaterial = UMaterialInstanceDynamic::Create(CameraMaterialBase, this);
@@ -196,22 +108,70 @@ void AARHUD::BeginPlay()
         if (DebugPanelWidget)
         {
             DebugPanelWidget->AddToViewport(1000);
-            UE_LOG(LogTemp, Log, TEXT("AARHUD: DebugPanel created and added to viewport (Z=1000)"));
         }
-        else
-        {
-            UE_LOG(LogTemp, Warning, TEXT("AARHUD: DebugPanel create failed"));
-        }
-    }
-    else
-    {
-        UE_LOG(LogTemp, Warning, TEXT("AARHUD: DebugPanel skipped (class or player controller missing)"));
     }
 
     UpdateDepthWidgetState();
     UpdateDebugPanelState();
     PushThoraxDepthToDebugPanel();
 
+}
+
+void AARHUD::ValidateEditorAssignments() const
+{
+    if (!DepthWidgetClass)
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("AARHUD: DepthWidgetClass is null. Assign a widget (e.g. UI_DepthShower) in HUD class defaults.")
+        );
+    }
+
+    if (!DepthMaterialBase)
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("AARHUD: DepthMaterialBase is null. Assign MT_DepthMaterial in HUD class defaults.")
+        );
+    }
+
+    if (!CameraMaterialBase)
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("AARHUD: CameraMaterialBase is null. Assign MT_Camera in HUD class defaults.")
+        );
+    }
+
+    if (!CameraRenderTarget)
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("AARHUD: CameraRenderTarget is null. Assign RT_Camera in HUD class defaults.")
+        );
+    }
+
+    if (!DebugPanelClass)
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("AARHUD: DebugPanelClass is null. Depth graph panel updates will not be visible.")
+        );
+    }
+
+    if (!ChestAreaMaterial)
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("AARHUD: ChestAreaMaterial is null. Chest box will use fallback color only.")
+        );
+    }
 }
 
 void AARHUD::GetThoraxDepthHistory(TArray<int32>& OutHistoryMillimeters, int32& OutLatestDepthMillimeters, bool& bOutHasDepth) const
@@ -258,37 +218,67 @@ void AARHUD::Tick(float DeltaSeconds)
         PoseDetectionComponent->PerformPoseDetectionOnFrame();
     }
 
-    if (!bLogThoraxDepthMean && !bShowThoraxDepthReadout && !bEnableThoraxDepthGraphUpdates)
+    if (!bLogThoraxDepthMean && !bEnableThoraxDepthGraphUpdates)
     {
         return;
     }
-
-    TimeSinceThoraxDepthLog += DeltaSeconds;
-    TimeSinceThoraxDepthLog = 0.0f;
 
     if (!PoseDetectionComponent || !PoseDetectionComponent->BodyPoseManager)
     {
         bHasThoraxDepthReading = false;
+        bHasActiveThoraxBounds = false;
+        bSmoothedBoundsInitialized = false;
+        bSmoothedDepthInitialized = false;
         return;
     }
 
     const TArray<FPoseJoint>& Joints = PoseDetectionComponent->BodyPoseManager->DetectedJoints;
-    FVector2D ThoraxUV = FVector2D::ZeroVector;
-    if (!TryGetThoraxDepthUV(Joints, ThoraxUV))
+    FVector2D ThoraxMinUV = FVector2D::ZeroVector;
+    FVector2D ThoraxMaxUV = FVector2D::ZeroVector;
+    if (!TryGetThoraxBoundsUV(Joints, ThoraxMinUV, ThoraxMaxUV))
     {
         bHasThoraxDepthReading = false;
-        UE_LOG(LogTemp, Warning, TEXT("Thorax depth mean skipped: no reliable thorax/chest joints"));
+        bHasActiveThoraxBounds = false;
+        bSmoothedBoundsInitialized = false;
+        UE_LOG(LogTemp, Warning, TEXT("Thorax depth mean skipped: full thorax bounds not available (need both shoulders and hips)"));
         return;
     }
+
+    if (bSmoothThoraxBoundsUV)
+    {
+        if (!bSmoothedBoundsInitialized)
+        {
+            SmoothedThoraxMinUV = ThoraxMinUV;
+            SmoothedThoraxMaxUV = ThoraxMaxUV;
+            bSmoothedBoundsInitialized = true;
+        }
+        else
+        {
+            const float BoundsAlpha = FMath::Clamp(ThoraxBoundsUVSmoothingAlpha, 0.01f, 1.0f);
+            SmoothedThoraxMinUV = FMath::Lerp(SmoothedThoraxMinUV, ThoraxMinUV, BoundsAlpha);
+            SmoothedThoraxMaxUV = FMath::Lerp(SmoothedThoraxMaxUV, ThoraxMaxUV, BoundsAlpha);
+        }
+
+        ThoraxMinUV = SmoothedThoraxMinUV;
+        ThoraxMaxUV = SmoothedThoraxMaxUV;
+    }
+
+    ActiveThoraxMinUV = ThoraxMinUV;
+    ActiveThoraxMaxUV = ThoraxMaxUV;
+    bHasActiveThoraxBounds = true;
+
+    const FVector2D ThoraxCenterUV = 0.5f * (ThoraxMinUV + ThoraxMaxUV);
 
     float MeanDepthValue = 0.0f;
     float MinDepthValue = 0.0f;
     float MaxDepthValue = 0.0f;
     float DepthSampleConfidence = 0.0f;
     int32 SampleCount = 0;
-    if (!ComputeDepthMeanAtUV(ThoraxUV, MeanDepthValue, SampleCount, &MinDepthValue, &MaxDepthValue, &DepthSampleConfidence))
+    if (!ComputeDepthMeanInBoundsUV(ThoraxMinUV, ThoraxMaxUV, MeanDepthValue, SampleCount, &MinDepthValue, &MaxDepthValue, &DepthSampleConfidence))
     {
         bHasThoraxDepthReading = false;
+        bHasActiveThoraxBounds = false;
+        bSmoothedDepthInitialized = false;
         UE_LOG(
             LogTemp,
             Warning,
@@ -297,6 +287,22 @@ void AARHUD::Tick(float DeltaSeconds)
             MinDepthSampleConfidence
         );
         return;
+    }
+
+    if (bUseDepthSmoothing)
+    {
+        if (!bSmoothedDepthInitialized)
+        {
+            SmoothedThoraxDepthValue = MeanDepthValue;
+            bSmoothedDepthInitialized = true;
+        }
+        else
+        {
+            const float DepthAlpha = FMath::Clamp(DepthSmoothingAlpha, 0.01f, 1.0f);
+            SmoothedThoraxDepthValue = FMath::Lerp(SmoothedThoraxDepthValue, MeanDepthValue, DepthAlpha);
+        }
+
+        MeanDepthValue = SmoothedThoraxDepthValue;
     }
 
     const float SafeFarMeters = FMath::Max(DepthNearMeters + KINDA_SMALL_NUMBER, DepthFarMeters);
@@ -322,11 +328,6 @@ void AARHUD::Tick(float DeltaSeconds)
     RecordThoraxDepthSample(MeanDepthMillimeters);
     PushThoraxDepthToDebugPanel();
 
-    if (!bLogThoraxDepthMean)
-    {
-        return;
-    }
-
     if (bLogThoraxDepthMinMax)
     {
         if (bLogThoraxDepthInMillimeters)
@@ -340,8 +341,8 @@ void AARHUD::Tick(float DeltaSeconds)
                 MinDepthMillimeters,
                 MaxDepthMillimeters,
                 SampleCount,
-                ThoraxUV.X,
-                ThoraxUV.Y,
+                ThoraxCenterUV.X,
+                ThoraxCenterUV.Y,
                 bDepthMaterialValuesAreNormalized ? TEXT("true") : TEXT("false"),
                 DepthNearMeters,
                 SafeFarMeters
@@ -355,54 +356,9 @@ void AARHUD::Tick(float DeltaSeconds)
                 MinDepthSampleConfidence
             );
         }
-        else
-        {
-            UE_LOG(
-                LogTemp,
-                Log,
-                TEXT("Thorax depth mean: %.3f m, min: %.3f m, max: %.3f m, samples=%d, uv=(%.3f, %.3f), normalized=%s, vizNear=%.2fm, vizFar=%.2fm"),
-                MeanDepthMeters,
-                MinDepthMeters,
-                MaxDepthMeters,
-                SampleCount,
-                ThoraxUV.X,
-                ThoraxUV.Y,
-                bDepthMaterialValuesAreNormalized ? TEXT("true") : TEXT("false"),
-                DepthNearMeters,
-                SafeFarMeters
-            );
-        }
+        
     }
-    else
-    {
-        if (bLogThoraxDepthInMillimeters)
-        {
-            UE_LOG(
-                LogTemp,
-                Log,
-                TEXT("Thorax depth mean: %d mm (%.3f m), samples=%d, uv=(%.3f, %.3f), normalized=%s"),
-                MeanDepthMillimeters,
-                MeanDepthMeters,
-                SampleCount,
-                ThoraxUV.X,
-                ThoraxUV.Y,
-                bDepthMaterialValuesAreNormalized ? TEXT("true") : TEXT("false")
-            );
-        }
-        else
-        {
-            UE_LOG(
-                LogTemp,
-                Log,
-                TEXT("Thorax depth mean: %.3f m, samples=%d, uv=(%.3f, %.3f), normalized=%s"),
-                MeanDepthMeters,
-                SampleCount,
-                ThoraxUV.X,
-                ThoraxUV.Y,
-                bDepthMaterialValuesAreNormalized ? TEXT("true") : TEXT("false")
-            );
-        }
-    }
+    
 }
 
 void AARHUD::DrawHUD()
@@ -410,14 +366,17 @@ void AARHUD::DrawHUD()
     Super::DrawHUD();
 
     DrawDepthToggleButton();
-    DrawThoraxDepthReadout();
+    DrawChestSamplingArea();
 
     if (!Canvas || !PoseDetectionComponent || !PoseDetectionComponent->BodyPoseManager)
     {
         return;
     }
 
-    DrawJointsOverlay();
+    if (bDrawJointDots || bDrawJointLabels)
+    {
+        DrawJointsOverlay();
+    }
 
 }
 
@@ -434,6 +393,11 @@ void AARHUD::NotifyHitBoxClick(FName BoxName)
 
 void AARHUD::DrawJointsOverlay()
 {
+    if (!bDrawJointDots && !bDrawJointLabels)
+    {
+        return;
+    }
+
     if (!PoseDetectionComponent)        return;
     if (!PoseDetectionComponent->BodyPoseManager) return;
     
@@ -453,7 +417,7 @@ void AARHUD::DrawJointsOverlay()
         const float DotX = ScreenPos.X - DotHalf;
         const float DotY = ScreenPos.Y - DotHalf;
 
-        if (JointDotMaterial)
+        if (bDrawJointDots && JointDotMaterial)
         {
             DrawMaterial(
                 JointDotMaterial,
@@ -471,7 +435,7 @@ void AARHUD::DrawJointsOverlay()
                 FVector2D::ZeroVector
             );
         }
-        else
+        else if (bDrawJointDots)
         {
             // Fallback marker when no dot material is assigned in the HUD defaults.
             DrawRect(JointTextColor, DotX, DotY, JointDotSize, JointDotSize);
@@ -493,11 +457,8 @@ void AARHUD::DrawJointsOverlay()
     }
 }
 
-bool AARHUD::TryGetThoraxDepthUV(const TArray<FPoseJoint>& Joints, FVector2D& OutUV) const
+bool AARHUD::TryGetThoraxBoundsUV(const TArray<FPoseJoint>& Joints, FVector2D& OutMinUV, FVector2D& OutMaxUV) const
 {
-    const FPoseJoint* BestTorsoJoint = nullptr;
-    float BestTorsoConfidence = -1.0f;
-
     const FPoseJoint* LeftShoulder = nullptr;
     const FPoseJoint* RightShoulder = nullptr;
     const FPoseJoint* LeftHip = nullptr;
@@ -511,16 +472,6 @@ bool AARHUD::TryGetThoraxDepthUV(const TArray<FPoseJoint>& Joints, FVector2D& Ou
         }
 
         const EThoraxJointRole JointRole = ResolveThoraxJointRole(Joint.Name);
-
-        if (JointRole == EThoraxJointRole::Torso)
-        {
-            if (Joint.Confidence > BestTorsoConfidence)
-            {
-                BestTorsoJoint = &Joint;
-                BestTorsoConfidence = Joint.Confidence;
-            }
-        }
-
         if (JointRole == EThoraxJointRole::LeftShoulder)
         {
             LeftShoulder = &Joint;
@@ -538,59 +489,70 @@ bool AARHUD::TryGetThoraxDepthUV(const TArray<FPoseJoint>& Joints, FVector2D& Ou
             RightHip = &Joint;
         }
     }
-    if (BestTorsoJoint)
+
+    if (!LeftShoulder || !RightShoulder || !LeftHip || !RightHip)
     {
-        OutUV = FVector2D(BestTorsoJoint->X, BestTorsoJoint->Y);
+        return false;
     }
-    else
+
+    TArray<FVector2D> BoundsPoints;
+    BoundsPoints.Reserve(4);
+    BoundsPoints.Add(FVector2D(LeftShoulder->X, LeftShoulder->Y));
+    BoundsPoints.Add(FVector2D(RightShoulder->X, RightShoulder->Y));
+    BoundsPoints.Add(FVector2D(LeftHip->X, LeftHip->Y));
+    BoundsPoints.Add(FVector2D(RightHip->X, RightHip->Y));
+
+    bool bAllNormalized = true;
+    for (const FVector2D& Point : BoundsPoints)
     {
-        if (!LeftShoulder || !RightShoulder)
+        if (Point.X < 0.0f || Point.X > 1.0f || Point.Y < 0.0f || Point.Y > 1.0f)
         {
-            return false;
-        }
-
-        const FVector2D ShoulderCenter = FVector2D(
-            0.5f * (LeftShoulder->X + RightShoulder->X),
-            0.5f * (LeftShoulder->Y + RightShoulder->Y)
-        );
-
-        if (LeftHip && RightHip)
-        {
-            const FVector2D HipCenter = FVector2D(
-                0.5f * (LeftHip->X + RightHip->X),
-                0.5f * (LeftHip->Y + RightHip->Y)
-            );
-
-            OutUV = ShoulderCenter * 0.65f + HipCenter * 0.35f;
-        }
-        else
-        {
-            OutUV = ShoulderCenter;
+            bAllNormalized = false;
+            break;
         }
     }
 
-    const bool bNormalizedX = OutUV.X >= 0.0f && OutUV.X <= 1.0f;
-    const bool bNormalizedY = OutUV.Y >= 0.0f && OutUV.Y <= 1.0f;
-
-    if ((!bNormalizedX || !bNormalizedY) && CameraRenderTarget && CameraRenderTarget->SizeX > 0 && CameraRenderTarget->SizeY > 0)
+    if (!bAllNormalized && CameraRenderTarget && CameraRenderTarget->SizeX > 0 && CameraRenderTarget->SizeY > 0)
     {
-        OutUV.X /= static_cast<float>(CameraRenderTarget->SizeX);
-        OutUV.Y /= static_cast<float>(CameraRenderTarget->SizeY);
+        const float InvWidth = 1.0f / static_cast<float>(CameraRenderTarget->SizeX);
+        const float InvHeight = 1.0f / static_cast<float>(CameraRenderTarget->SizeY);
+        for (FVector2D& Point : BoundsPoints)
+        {
+            Point.X *= InvWidth;
+            Point.Y *= InvHeight;
+        }
     }
 
-    OutUV.X = FMath::Clamp(OutUV.X, 0.0f, 1.0f);
-    OutUV.Y = FMath::Clamp(OutUV.Y, 0.0f, 1.0f);
-
-    if (bFlipNormalizedJointY)
+    for (FVector2D& Point : BoundsPoints)
     {
-        OutUV.Y = 1.0f - OutUV.Y;
+        Point.X = FMath::Clamp(Point.X, 0.0f, 1.0f);
+        Point.Y = FMath::Clamp(Point.Y, 0.0f, 1.0f);
+        if (bFlipNormalizedJointY)
+        {
+            Point.Y = 1.0f - Point.Y;
+        }
     }
 
+    float MinX = TNumericLimits<float>::Max();
+    float MinY = TNumericLimits<float>::Max();
+    float MaxX = TNumericLimits<float>::Lowest();
+    float MaxY = TNumericLimits<float>::Lowest();
+    for (const FVector2D& Point : BoundsPoints)
+    {
+        MinX = FMath::Min(MinX, Point.X);
+        MinY = FMath::Min(MinY, Point.Y);
+        MaxX = FMath::Max(MaxX, Point.X);
+        MaxY = FMath::Max(MaxY, Point.Y);
+    }
+
+    OutMinUV = FVector2D(MinX, MinY);
+    OutMaxUV = FVector2D(MaxX, MaxY);
     return true;
 }
 
-bool AARHUD::ComputeDepthMeanAtUV(
-    const FVector2D& UV,
+bool AARHUD::ComputeDepthMeanInBoundsUV(
+    const FVector2D& MinUV,
+    const FVector2D& MaxUV,
     float& OutMeanDepthValue,
     int32& OutSampleCount,
     float* OutMinDepthValue,
@@ -658,9 +620,10 @@ bool AARHUD::ComputeDepthMeanAtUV(
     const int32 Width = DepthDebugRenderTarget->SizeX;
     const int32 Height = DepthDebugRenderTarget->SizeY;
 
-    const int32 CenterX = FMath::Clamp(FMath::RoundToInt(UV.X * static_cast<float>(Width - 1)), 0, Width - 1);
-    const int32 CenterY = FMath::Clamp(FMath::RoundToInt(UV.Y * static_cast<float>(Height - 1)), 0, Height - 1);
-    const int32 Radius = FMath::Max(1, ThoraxDepthSampleRadiusPixels);
+    const int32 StartX = FMath::Clamp(FMath::RoundToInt(FMath::Min(MinUV.X, MaxUV.X) * static_cast<float>(Width - 1)), 0, Width - 1);
+    const int32 EndX = FMath::Clamp(FMath::RoundToInt(FMath::Max(MinUV.X, MaxUV.X) * static_cast<float>(Width - 1)), 0, Width - 1);
+    const int32 StartY = FMath::Clamp(FMath::RoundToInt(FMath::Min(MinUV.Y, MaxUV.Y) * static_cast<float>(Height - 1)), 0, Height - 1);
+    const int32 EndY = FMath::Clamp(FMath::RoundToInt(FMath::Max(MinUV.Y, MaxUV.Y) * static_cast<float>(Height - 1)), 0, Height - 1);
 
     const float SafeMaxValidDepthMeters = FMath::Max(MinValidDepthMeters + KINDA_SMALL_NUMBER, MaxValidDepthMeters);
     const float SafeMaxStdDev = FMath::Max(0.001f, MaxDepthStdDevForConfidenceMeters);
@@ -672,17 +635,10 @@ bool AARHUD::ComputeDepthMeanAtUV(
     float MinDepth = TNumericLimits<float>::Max();
     float MaxDepth = TNumericLimits<float>::Lowest();
 
-    for (int32 Y = FMath::Max(0, CenterY - Radius); Y <= FMath::Min(Height - 1, CenterY + Radius); ++Y)
+    for (int32 Y = StartY; Y <= EndY; ++Y)
     {
-        for (int32 X = FMath::Max(0, CenterX - Radius); X <= FMath::Min(Width - 1, CenterX + Radius); ++X)
+        for (int32 X = StartX; X <= EndX; ++X)
         {
-            const int32 DX = X - CenterX;
-            const int32 DY = Y - CenterY;
-            if (DX * DX + DY * DY > Radius * Radius)
-            {
-                continue;
-            }
-
             ++CandidateCount;
 
             const FLinearColor& Pixel = PixelData[Y * Width + X];
@@ -835,26 +791,70 @@ void AARHUD::DrawDepthToggleButton()
     );
 }
 
-void AARHUD::DrawThoraxDepthReadout()
+void AARHUD::DrawChestSamplingArea()
 {
-    if (!Canvas || !bShowThoraxDepthReadout)
+    if (!Canvas || !bShowChestSamplingArea)
     {
         return;
     }
 
-    const FString ReadoutText = bHasThoraxDepthReading
-        ? FString::Printf(TEXT("Thorax depth: %d mm"), LastThoraxDepthMillimeters)
-        : TEXT("Thorax depth: -- mm");
+    if (!bHasActiveThoraxBounds)
+    {
+        return;
+    }
 
-    DrawText(
-        ReadoutText,
-        ThoraxDepthReadoutColor,
-        ThoraxDepthReadoutPosition.X,
-        ThoraxDepthReadoutPosition.Y,
-        JointFont,
-        ThoraxDepthReadoutScale,
-        false
-    );
+    const float Width = Canvas->ClipX;
+    const float Height = Canvas->ClipY;
+    if (Width <= 1.0f || Height <= 1.0f)
+    {
+        return;
+    }
+
+    const float MinX = FMath::Min(ActiveThoraxMinUV.X, ActiveThoraxMaxUV.X);
+    const float MaxX = FMath::Max(ActiveThoraxMinUV.X, ActiveThoraxMaxUV.X);
+    const float MinY = FMath::Min(ActiveThoraxMinUV.Y, ActiveThoraxMaxUV.Y);
+    const float MaxY = FMath::Max(ActiveThoraxMinUV.Y, ActiveThoraxMaxUV.Y);
+
+    float RectX = MinX * Width;
+    float RectY = MinY * Height;
+    float RectW = (MaxX - MinX) * Width;
+    float RectH = (MaxY - MinY) * Height;
+
+    RectX = FMath::Clamp(RectX, 0.0f, Width - 1.0f);
+    RectY = FMath::Clamp(RectY, 0.0f, Height - 1.0f);
+    RectW = FMath::Clamp(RectW, 1.0f, Width - RectX);
+    RectH = FMath::Clamp(RectH, 1.0f, Height - RectY);
+
+    if (ChestAreaMaterial)
+    {
+        DrawMaterial(
+            ChestAreaMaterial,
+            RectX,
+            RectY,
+            RectW,
+            RectH,
+            0.0f,
+            0.0f,
+            1.0f,
+            1.0f,
+            1.0f,
+            false,
+            0.0f,
+            FVector2D::ZeroVector
+        );
+    }
+    else
+    {
+        DrawRect(ChestAreaFallbackColor, RectX, RectY, RectW, RectH);
+    }
+
+    if (ChestAreaOutlineThickness > 0.0f)
+    {
+        DrawLine(RectX, RectY, RectX + RectW, RectY, ChestAreaOutlineColor, ChestAreaOutlineThickness);
+        DrawLine(RectX, RectY + RectH, RectX + RectW, RectY + RectH, ChestAreaOutlineColor, ChestAreaOutlineThickness);
+        DrawLine(RectX, RectY, RectX, RectY + RectH, ChestAreaOutlineColor, ChestAreaOutlineThickness);
+        DrawLine(RectX + RectW, RectY, RectX + RectW, RectY + RectH, ChestAreaOutlineColor, ChestAreaOutlineThickness);
+    }
 }
 
 void AARHUD::RecordThoraxDepthSample(const int32 DepthMillimeters)
@@ -905,24 +905,6 @@ void AARHUD::PushThoraxDepthToDebugPanel()
     Params.DepthHistoryMillimeters = ThoraxDepthHistoryMillimeters;
     Params.CurrentDepthMillimeters = LastThoraxDepthMillimeters;
     Params.bHasDepth = bHasThoraxDepthReading;
-
-    {
-        static double LastGraphPushLogSeconds = 0.0;
-        const double NowSeconds = FPlatformTime::Seconds();
-        if (NowSeconds - LastGraphPushLogSeconds > 1.0)
-        {
-            UE_LOG(
-                LogTemp,
-                Log,
-                TEXT("AARHUD: PushThoraxDepthToDebugPanel -> history=%d current=%d hasDepth=%s targetFn=%s"),
-                Params.DepthHistoryMillimeters.Num(),
-                Params.CurrentDepthMillimeters,
-                Params.bHasDepth ? TEXT("true") : TEXT("false"),
-                *DebugPanelDepthUpdateFunctionName.ToString()
-            );
-            LastGraphPushLogSeconds = NowSeconds;
-        }
-    }
 
     DebugPanelWidget->ProcessEvent(UpdateFunction, &Params);
 }
