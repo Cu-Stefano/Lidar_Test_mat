@@ -306,9 +306,9 @@ void AARHUD::Tick(float DeltaSeconds)
     const float MeanDepthMeters = MaterialValueToMeters(MeanDepthValue);
     const float MinDepthMeters = MaterialValueToMeters(MinDepthValue);
     const float MaxDepthMeters = MaterialValueToMeters(MaxDepthValue);
-    const int32 MeanDepthMillimeters = FMath::RoundToInt(MeanDepthMeters * 1000.0f);
-    const int32 MinDepthMillimeters = FMath::RoundToInt(MinDepthMeters * 1000.0f);
-    const int32 MaxDepthMillimeters = FMath::RoundToInt(MaxDepthMeters * 1000.0f);
+    const int32 MeanDepthMillimeters = FMath::RoundToInt(MeanDepthMeters * 10000.0f);
+    const int32 MinDepthMillimeters = FMath::RoundToInt(MinDepthMeters * 10000.0f);
+    const int32 MaxDepthMillimeters = FMath::RoundToInt(MaxDepthMeters * 10000.0f);
 
     LastThoraxDepthMillimeters = MeanDepthMillimeters;
     bHasThoraxDepthReading = true;

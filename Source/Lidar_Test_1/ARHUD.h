@@ -158,13 +158,13 @@ protected:
 
     // True when MT_DepthMaterial outputs normalized depth in [0..1] using DepthNearMeters/DepthFarMeters.
     UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
-    bool bDepthMaterialValuesAreNormalized = true;
+    bool bDepthMaterialValuesAreNormalized = false;
 
     UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
     bool bLogThoraxDepthInMillimeters = true;
 
     UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
-    bool bUseFloat32DepthSampling = false;
+    bool bUseFloat32DepthSampling = true;
 
     UPROPERTY(Transient)
     TObjectPtr<UTextureRenderTarget2D> DepthDebugRenderTarget = nullptr;
@@ -178,7 +178,7 @@ protected:
     bool bHasThoraxDepthReading = false;
 
     UPROPERTY(EditAnywhere, Category="UI|DepthGraph", meta=(ClampMin="8", ClampMax="512"))
-    int32 ThoraxDepthHistoryMaxSamples = 500;
+    int32 ThoraxDepthHistoryMaxSamples = 700;
 
     UPROPERTY(EditAnywhere, Category="UI|DepthGraph")
     FName DebugPanelDepthUpdateFunctionName = TEXT("UpdateThoraxDepthGraph");

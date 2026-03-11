@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include <CoreFoundation/CFBase.h>
 #include "UDepthGraphWidget.generated.h"
 
 /**
@@ -52,6 +53,20 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style", meta=(ClampMin="16", ClampMax="512"))
 	int32 MaxRenderedSamples = 160;
+
+	// ---- Y-axis fixed range ----
+	// Se true, MinDepth/MaxDepth vengono forzati ai valori sotto invece di essere
+	// calcolati automaticamente dai campioni.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis")
+	bool bUseFixedYRange = true;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis",
+	          meta=(EditCondition="bUseFixedYRange", ClampMin="0", ClampMax="20000"))
+	int32 FixedYMinMillimeters = 900;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis",
+	          meta=(EditCondition="bUseFixedYRange", ClampMin="1", ClampMax="20000"))
+	int32 FixedYMaxMillimeters = 1200;
 
 	UPROPERTY(BlueprintReadOnly, Category="Depth Graph|Data")
 	TArray<int32> DepthHistoryMillimeters;

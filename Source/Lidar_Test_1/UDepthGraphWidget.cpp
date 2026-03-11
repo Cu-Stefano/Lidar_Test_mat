@@ -191,7 +191,17 @@ int32 UUDepthGraphWidget::NativePaint(
 		MaxDepth = FMath::Max(MaxDepth, Value);
 	}
 
-	if (MinDepth == MaxDepth)
+	if (bUseFixedYRange)
+	{
+		constexpr int32 FixedRangePaddingMillimeters = 10;
+		MinDepth = FMath::Max(0, MinDepth - FixedRangePaddingMillimeters);
+		MaxDepth = MaxDepth + FixedRangePaddingMillimeters;
+		if (MinDepth == MaxDepth)
+		{
+			MaxDepth = MinDepth + 1;
+		}
+	}
+	else if (MinDepth == MaxDepth)
 	{
 		MaxDepth = MinDepth + 1;
 	}
