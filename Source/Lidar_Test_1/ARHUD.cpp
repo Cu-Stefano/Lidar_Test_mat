@@ -284,11 +284,18 @@ void AARHUD::Tick(float DeltaSeconds)
     float MeanDepthValue = 0.0f;
     float MinDepthValue = 0.0f;
     float MaxDepthValue = 0.0f;
+    float DepthSampleConfidence = 0.0f;
     int32 SampleCount = 0;
-    if (!ComputeDepthMeanAtUV(ThoraxUV, MeanDepthValue, SampleCount, &MinDepthValue, &MaxDepthValue))
+    if (!ComputeDepthMeanAtUV(ThoraxUV, MeanDepthValue, SampleCount, &MinDepthValue, &MaxDepthValue, &DepthSampleConfidence))
     {
         bHasThoraxDepthReading = false;
-        UE_LOG(LogTemp, Warning, TEXT("Thorax depth mean skipped: cannot sample depth texture"));
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("Thorax depth mean skipped: cannot sample depth texture or confidence is too low (confidence=%.2f, min=%.2f)"),
+            DepthSampleConfidence,
+            MinDepthSampleConfidence
+        );
         return;
     }
 
@@ -338,6 +345,14 @@ void AARHUD::Tick(float DeltaSeconds)
                 bDepthMaterialValuesAreNormalized ? TEXT("true") : TEXT("false"),
                 DepthNearMeters,
                 SafeFarMeters
+            );
+
+            UE_LOG(
+                LogTemp,
+                Verbose,
+                TEXT("Thorax depth confidence: %.2f (threshold %.2f)"),
+                DepthSampleConfidence,
+                MinDepthSampleConfidence
             );
         }
         else
@@ -579,7 +594,8 @@ bool AARHUD::ComputeDepthMeanAtUV(
     float& OutMeanDepthValue,
     int32& OutSampleCount,
     float* OutMinDepthValue,
-    float* OutMaxDepthValue
+    float* OutMaxDepthValue,
+    float* OutDepthSampleConfidence
 )
 {
     if (!DepthMaterial)
@@ -646,7 +662,12 @@ bool AARHUD::ComputeDepthMeanAtUV(
     const int32 CenterY = FMath::Clamp(FMath::RoundToInt(UV.Y * static_cast<float>(Height - 1)), 0, Height - 1);
     const int32 Radius = FMath::Max(1, ThoraxDepthSampleRadiusPixels);
 
+    const float SafeMaxValidDepthMeters = FMath::Max(MinValidDepthMeters + KINDA_SMALL_NUMBER, MaxValidDepthMeters);
+    const float SafeMaxStdDev = FMath::Max(0.001f, MaxDepthStdDevForConfidenceMeters);
+
     double DepthSum = 0.0;
+    double DepthSquaredSum = 0.0;
+    int32 CandidateCount = 0;
     int32 Count = 0;
     float MinDepth = TNumericLimits<float>::Max();
     float MaxDepth = TNumericLimits<float>::Lowest();
@@ -662,9 +683,18 @@ bool AARHUD::ComputeDepthMeanAtUV(
                 continue;
             }
 
+            ++CandidateCount;
+
             const FLinearColor& Pixel = PixelData[Y * Width + X];
             const float PixelDepth = Pixel.R;
+
+            if (!FMath::IsFinite(PixelDepth) || PixelDepth < MinValidDepthMeters || PixelDepth > SafeMaxValidDepthMeters)
+            {
+                continue;
+            }
+
             DepthSum += static_cast<double>(PixelDepth);
+            DepthSquaredSum += static_cast<double>(PixelDepth) * static_cast<double>(PixelDepth);
             MinDepth = FMath::Min(MinDepth, PixelDepth);
             MaxDepth = FMath::Max(MaxDepth, PixelDepth);
             ++Count;
@@ -678,6 +708,29 @@ bool AARHUD::ComputeDepthMeanAtUV(
 
     OutSampleCount = Count;
     OutMeanDepthValue = static_cast<float>(DepthSum / static_cast<double>(Count));
+
+    float DepthSampleConfidence = 1.0f;
+    if (CandidateCount > 0)
+    {
+        const float ValidRatio = static_cast<float>(Count) / static_cast<float>(CandidateCount);
+        const double Mean = DepthSum / static_cast<double>(Count);
+        const double MeanSquared = Mean * Mean;
+        const double Variance = FMath::Max(0.0, (DepthSquaredSum / static_cast<double>(Count)) - MeanSquared);
+        const float StdDev = static_cast<float>(FMath::Sqrt(Variance));
+        const float Stability = 1.0f - FMath::Clamp(StdDev / SafeMaxStdDev, 0.0f, 1.0f);
+        DepthSampleConfidence = ValidRatio * Stability;
+    }
+
+    if (OutDepthSampleConfidence)
+    {
+        *OutDepthSampleConfidence = DepthSampleConfidence;
+    }
+
+    if (bUseDepthSampleConfidenceFilter && DepthSampleConfidence < MinDepthSampleConfidence)
+    {
+        return false;
+    }
+
     if (OutMinDepthValue)
     {
         *OutMinDepthValue = MinDepth;

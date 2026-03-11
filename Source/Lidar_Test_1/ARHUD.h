@@ -166,6 +166,25 @@ protected:
     UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
     bool bUseFloat32DepthSampling = true;
 
+    // Reject depth readings when local sampling quality is poor.
+    UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
+    bool bUseDepthSampleConfidenceFilter = true;
+
+    // Confidence in [0..1], computed from valid-pixel ratio and local depth stability.
+    UPROPERTY(EditAnywhere, Category="Pose|DepthDebug", meta=(ClampMin="0.0", ClampMax="1.0"))
+    float MinDepthSampleConfidence = 0.45f;
+
+    // Depth values outside this range are ignored as invalid during confidence estimation.
+    UPROPERTY(EditAnywhere, Category="Pose|DepthDebug", meta=(ClampMin="0.01", ClampMax="20.0"))
+    float MinValidDepthMeters = 0.05f;
+
+    UPROPERTY(EditAnywhere, Category="Pose|DepthDebug", meta=(ClampMin="0.1", ClampMax="30.0"))
+    float MaxValidDepthMeters = 10.0f;
+
+    // Local standard deviation at this value or above is treated as low confidence.
+    UPROPERTY(EditAnywhere, Category="Pose|DepthDebug", meta=(ClampMin="0.001", ClampMax="2.0"))
+    float MaxDepthStdDevForConfidenceMeters = 0.18f;
+
     UPROPERTY(Transient)
     TObjectPtr<UTextureRenderTarget2D> DepthDebugRenderTarget = nullptr;
 
@@ -208,6 +227,7 @@ private:
         float& OutMeanDepthValue,
         int32& OutSampleCount,
         float* OutMinDepthValue,
-        float* OutMaxDepthValue
+        float* OutMaxDepthValue,
+        float* OutDepthSampleConfidence
     );
 };
