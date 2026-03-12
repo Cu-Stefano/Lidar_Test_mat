@@ -12,6 +12,7 @@ class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class UTextureRenderTarget2D;
 class UPoseDetectionComponent;
+class UUARKitDepthCameraProvider;
 class UFont;
 
 /**
@@ -73,7 +74,10 @@ protected:
     TObjectPtr<UTextureRenderTarget2D> CameraRenderTarget = nullptr;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="UI")
-    TObjectPtr<UPoseDetectionComponent> PoseDetectionComponent = nullptr;
+    TObjectPtr<UPoseDetectionComponent> PoseDetectionComponent = nullptr; // TO MAKE ABSTRACT
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="UI")
+    TObjectPtr<UUARKitDepthCameraProvider> DepthCameraProvider = nullptr;
 
     // ================= Materiali =================
     UPROPERTY(EditAnywhere, Category="UI")

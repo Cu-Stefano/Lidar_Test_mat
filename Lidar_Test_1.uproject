@@ -36,6 +36,13 @@
 		{
 			"Name": "UdpMessaging",
 			"Enabled": false
+		},
+		{
+			"Name": "PoseDetectionPlugin",
+			"Enabled": false,
+			"SupportedTargetPlatforms": [
+				"IOS"
+			]
 		}
 	],
 	"TargetPlatforms": [

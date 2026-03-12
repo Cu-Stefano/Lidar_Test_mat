@@ -3,7 +3,6 @@
 
 #include "ARHUD.h"
 
-#include "ARBlueprintLibrary.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/Canvas.h"
 #include "Engine/Font.h"
@@ -12,6 +11,8 @@
 #include "Kismet/KismetRenderingLibrary.h"
 #include "PoseDetectionComponent.h"
 #include "BodyPoseManager.h"
+#include "IDepthCamera.h"
+#include "UARKitDepthCameraProvider.h"
 
 namespace
 {
@@ -71,6 +72,7 @@ AARHUD::AARHUD()
 {
     PrimaryActorTick.bCanEverTick = true;
     PoseDetectionComponent = CreateDefaultSubobject<UPoseDetectionComponent>(TEXT("PoseDetectionComponent"));
+    DepthCameraProvider = CreateDefaultSubobject<UUARKitDepthCameraProvider>(TEXT("DepthCameraProvider"));
 }
 
 void AARHUD::BeginPlay()
@@ -107,7 +109,7 @@ void AARHUD::BeginPlay()
         DebugPanelWidget = CreateWidget<UUserWidget>(PC, DebugPanelClass);
         if (DebugPanelWidget)
         {
-            DebugPanelWidget->AddToViewport(1000);
+            DebugPanelWidget->AddToViewport(10);
         }
     }
 
@@ -185,26 +187,26 @@ void AARHUD::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
 
-    if (DepthMaterial)
+    if (DepthMaterial && DepthCameraProvider)
     {
-        if (TObjectPtr<UARTexture> DepthTexture = UARBlueprintLibrary::GetARTexture(EARTextureType::SceneDepthMap))
-        {
-            DepthMaterial->SetTextureParameterValue(DepthTextureParameterName, DepthTexture);
-            DepthMaterial->SetScalarParameterValue(DepthNearMetersParameterName, DepthNearMeters);
-            DepthMaterial->SetScalarParameterValue(DepthFarMetersParameterName, FMath::Max(DepthNearMeters + KINDA_SMALL_NUMBER, DepthFarMeters));
-            if (bShowDepthOverlay)
+            if (UTexture* DepthTexture = DepthCameraProvider->GetDepthTexture())
             {
-                UpdateDepthWidgetState();
+                DepthMaterial->SetTextureParameterValue(DepthTextureParameterName, DepthTexture);
+                DepthMaterial->SetScalarParameterValue(DepthNearMetersParameterName, DepthNearMeters);
+                DepthMaterial->SetScalarParameterValue(DepthFarMetersParameterName, FMath::Max(DepthNearMeters + KINDA_SMALL_NUMBER, DepthFarMeters));
+                if (bShowDepthOverlay)
+                {
+                    UpdateDepthWidgetState();
+                }
             }
-        }
     }
 
-    if (CameraMaterial)
+    if (CameraMaterial && DepthCameraProvider)
     {
-        if (TObjectPtr<UARTexture> CameraTexture = UARBlueprintLibrary::GetARTexture(EARTextureType::CameraImage))
-        {
-            CameraMaterial->SetTextureParameterValue(CameraTextureParameterName, CameraTexture);
-        }
+            if (UTexture* CameraTexture = DepthCameraProvider->GetCameraTexture())
+            {
+                CameraMaterial->SetTextureParameterValue(CameraTextureParameterName, CameraTexture);
+            }
     }
 
     if (CameraRenderTarget && CameraMaterial)
@@ -218,17 +220,13 @@ void AARHUD::Tick(float DeltaSeconds)
         PoseDetectionComponent->PerformPoseDetectionOnFrame();
     }
 
-    if (!bLogThoraxDepthMean && !bEnableThoraxDepthGraphUpdates)
-    {
-        return;
-    }
-
     if (!PoseDetectionComponent || !PoseDetectionComponent->BodyPoseManager)
     {
         bHasThoraxDepthReading = false;
         bHasActiveThoraxBounds = false;
         bSmoothedBoundsInitialized = false;
         bSmoothedDepthInitialized = false;
+        UE_LOG(LogTemp, Warning, TEXT("Thorax depth mean skipped: PoseDetectionComponent or BodyPoseManager not valid"));
         return;
     }
 
@@ -403,7 +401,7 @@ void AARHUD::DrawJointsOverlay()
     
     const TArray<FPoseJoint>& Joints = PoseDetectionComponent->BodyPoseManager->DetectedJoints;
     
-    if (Joints.Num() == 0) return;  // array vuoto, niente da disegnare
+    if (Joints.Num() == 0) return;
 
     for (const FPoseJoint& Joint : Joints)
     {
@@ -557,8 +555,7 @@ bool AARHUD::ComputeDepthMeanInBoundsUV(
     int32& OutSampleCount,
     float* OutMinDepthValue,
     float* OutMaxDepthValue,
-    float* OutDepthSampleConfidence
-)
+    float* OutDepthSampleConfidence)
 {
     if (!DepthMaterial)
     {
