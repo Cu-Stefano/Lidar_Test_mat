@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
+#include "UObject/ScriptInterface.h"
+#include "IDepthCamera.h"
 #include "PoseDetectionComponent.h"
 #include "ARHUD.generated.h"
 
@@ -12,7 +14,6 @@ class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class UTextureRenderTarget2D;
 class UPoseDetectionComponent;
-class UUARKitDepthCameraProvider;
 class UFont;
 
 /**
@@ -77,7 +78,7 @@ protected:
     TObjectPtr<UPoseDetectionComponent> PoseDetectionComponent = nullptr; // TO MAKE ABSTRACT
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="UI")
-    TObjectPtr<UUARKitDepthCameraProvider> DepthCameraProvider = nullptr;
+    TScriptInterface<IIDepthCamera> DepthCameraProvider;
 
     // ================= Materiali =================
     UPROPERTY(EditAnywhere, Category="UI")

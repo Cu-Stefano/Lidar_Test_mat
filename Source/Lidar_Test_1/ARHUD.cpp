@@ -11,8 +11,8 @@
 #include "Kismet/KismetRenderingLibrary.h"
 #include "PoseDetectionComponent.h"
 #include "BodyPoseManager.h"
+#include "CameraFactorySingleton.h"
 #include "IDepthCamera.h"
-#include "UARKitDepthCameraProvider.h"
 
 namespace
 {
@@ -36,7 +36,6 @@ const TMap<FString, EThoraxJointRole>& GetThoraxJointRoleDictionary()
         {TEXT("root"), EThoraxJointRole::Torso},
         {TEXT("left_shoulder_1_joint"), EThoraxJointRole::LeftShoulder},
         {TEXT("right_shoulder_1_joint"), EThoraxJointRole::RightShoulder},
-        {TEXT("left_upleg_joint"), EThoraxJointRole::LeftHip},
         {TEXT("left_upleg_joint"), EThoraxJointRole::LeftHip},
         {TEXT("right_upleg_joint"), EThoraxJointRole::RightHip},
 
@@ -72,13 +71,20 @@ AARHUD::AARHUD()
 {
     PrimaryActorTick.bCanEverTick = true;
     PoseDetectionComponent = CreateDefaultSubobject<UPoseDetectionComponent>(TEXT("PoseDetectionComponent"));
-    DepthCameraProvider = CreateDefaultSubobject<UUARKitDepthCameraProvider>(TEXT("DepthCameraProvider"));
 }
 
 void AARHUD::BeginPlay()
 {
     Super::BeginPlay();
     ValidateEditorAssignments();
+
+    CameraFactorySingleton& Factory = CameraFactorySingleton::GetInstance();
+    DepthCameraProvider = Factory.CreateCamera(TEXT("Unreal"), this);
+
+    if (!DepthCameraProvider.GetObject())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("AARHUD: DepthCameraProvider creation failed."));
+    }
 
     TObjectPtr<APlayerController> PC = GetOwningPlayerController();
     if (DepthWidgetClass && PC)
@@ -187,9 +193,11 @@ void AARHUD::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
 
-    if (DepthMaterial && DepthCameraProvider)
+    IIDepthCamera* DepthCamera = DepthCameraProvider.GetInterface();
+
+    if (DepthMaterial && DepthCamera)
     {
-            if (UTexture* DepthTexture = DepthCameraProvider->GetDepthTexture())
+            if (UTexture* DepthTexture = DepthCamera->GetDepthTexture())
             {
                 DepthMaterial->SetTextureParameterValue(DepthTextureParameterName, DepthTexture);
                 DepthMaterial->SetScalarParameterValue(DepthNearMetersParameterName, DepthNearMeters);
@@ -201,9 +209,9 @@ void AARHUD::Tick(float DeltaSeconds)
             }
     }
 
-    if (CameraMaterial && DepthCameraProvider)
+        if (CameraMaterial && DepthCamera)
     {
-            if (UTexture* CameraTexture = DepthCameraProvider->GetCameraTexture())
+            if (UTexture* CameraTexture = DepthCamera->GetCameraTexture())
             {
                 CameraMaterial->SetTextureParameterValue(CameraTextureParameterName, CameraTexture);
             }
