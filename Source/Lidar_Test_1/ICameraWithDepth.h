@@ -4,13 +4,13 @@
 
 #include "CoreMinimal.h"	
 #include "UObject/Interface.h"
-#include "IDepthCamera.generated.h"
+#include "ICameraWithDepth.generated.h"
 
 class UTexture;
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
-class UIDepthCamera : public UInterface
+class UCameraWithDepth : public UInterface
 {
 	GENERATED_BODY()
 };
@@ -18,7 +18,7 @@ class UIDepthCamera : public UInterface
 /**
  * 
  */
-class LIDAR_TEST_1_API IIDepthCamera
+class LIDAR_TEST_1_API ICameraWithDepth
 {
 	GENERATED_BODY()
 

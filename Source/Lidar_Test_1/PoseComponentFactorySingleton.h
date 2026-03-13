@@ -10,17 +10,9 @@ class LIDAR_TEST_1_API PoseComponentFactorySingleton
 {
 
 public:
-    /**
-     * Ottiene l'istanza singleton della factory.
-     */
+
     static PoseComponentFactorySingleton& GetInstance();
 
-    /**
-     * Crea un componente pose detector del tipo richiesto e lo registra sull'Owner.
-     * @param TypeName  Tipo da creare (e.g. "Default").
-     * @param Owner     L'AActor a cui il componente verrà aggiunto.
-     * @return          L'interfaccia IIPoseDetector del componente creato, non valida in caso di errore.
-     */
     TScriptInterface<IIPoseDetector> CreatePoseComponent(const FString& TypeName, AActor* Owner = nullptr);
 
     bool IsTypeSupported(const FString& TypeName) const;

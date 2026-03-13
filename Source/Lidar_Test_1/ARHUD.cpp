@@ -13,7 +13,7 @@
 #include "BodyPoseManager.h"
 #include "CameraFactorySingleton.h"
 #include "PoseComponentFactorySingleton.h"
-#include "IDepthCamera.h"
+#include "ICameraWithDepth.h"
 
 namespace
 {
@@ -32,25 +32,12 @@ enum class EThoraxJointRole : uint8
 const TMap<FString, EThoraxJointRole>& GetThoraxJointRoleDictionary()
 {
     static const TMap<FString, EThoraxJointRole> Dictionary = {
-        // Vision joint names seen in logs.
         {TEXT("neck_1_joint"), EThoraxJointRole::Torso},
         {TEXT("root"), EThoraxJointRole::Torso},
         {TEXT("left_shoulder_1_joint"), EThoraxJointRole::LeftShoulder},
         {TEXT("right_shoulder_1_joint"), EThoraxJointRole::RightShoulder},
         {TEXT("left_upleg_joint"), EThoraxJointRole::LeftHip},
-        {TEXT("right_upleg_joint"), EThoraxJointRole::RightHip},
-
-        // Compatibility aliases.
-        {TEXT("left_shoulder"), EThoraxJointRole::LeftShoulder},
-        {TEXT("right_shoulder"), EThoraxJointRole::RightShoulder},
-        {TEXT("left_hip"), EThoraxJointRole::LeftHip},
-        {TEXT("right_hip"), EThoraxJointRole::RightHip},
-        {TEXT("thorax"), EThoraxJointRole::Torso},
-        {TEXT("chest"), EThoraxJointRole::Torso},
-        {TEXT("sternum"), EThoraxJointRole::Torso},
-        {TEXT("torso"), EThoraxJointRole::Torso},
-        {TEXT("spine_chest"), EThoraxJointRole::Torso},
-        {TEXT("mid_shoulder"), EThoraxJointRole::Torso},
+        {TEXT("right_upleg_joint"), EThoraxJointRole::RightHip}
     };
 
     return Dictionary;
@@ -78,6 +65,7 @@ void AARHUD::BeginPlay()
     Super::BeginPlay();
     ValidateEditorAssignments();
 
+    // Pose Component 
     PoseComponentFactorySingleton& PoseFactory = PoseComponentFactorySingleton::GetInstance();
     PoseDetectorProvider = PoseFactory.CreatePoseComponent(TEXT("Default"), this);
 
@@ -86,12 +74,13 @@ void AARHUD::BeginPlay()
         UE_LOG(LogTemp, Warning, TEXT("AARHUD: PoseDetectorProvider creation failed."));
     }
 
+    // Camera + Depth Component
     CameraFactorySingleton& Factory = CameraFactorySingleton::GetInstance();
-    DepthCameraProvider = Factory.CreateCamera(TEXT("Unreal"), this);
+    CameraWithDepthProvider = Factory.CreateCamera(TEXT("Unreal"), this);
 
-    if (!DepthCameraProvider.GetObject())
+    if (!CameraWithDepthProvider.GetObject())
     {
-        UE_LOG(LogTemp, Warning, TEXT("AARHUD: DepthCameraProvider creation failed."));
+        UE_LOG(LogTemp, Warning, TEXT("AARHUD: CameraWithDepthProvider creation failed."));
     }
 
     TObjectPtr<APlayerController> PC = GetOwningPlayerController();
@@ -118,18 +107,18 @@ void AARHUD::BeginPlay()
         CameraMaterial = UMaterialInstanceDynamic::Create(CameraMaterialBase, this);
     }
 
-    if (DebugPanelClass && PC)
+    if (MainPanelClass && PC)
     {
-        DebugPanelWidget = CreateWidget<UUserWidget>(PC, DebugPanelClass);
-        if (DebugPanelWidget)
+        MainPanelWidget = CreateWidget<UUserWidget>(PC, MainPanelClass);
+        if (MainPanelWidget)
         {
-            DebugPanelWidget->AddToViewport(10);
+            MainPanelWidget->AddToViewport(10);
         }
     }
 
     UpdateDepthWidgetState();
-    UpdateDebugPanelState();
-    PushThoraxDepthToDebugPanel();
+    UpdateMainPanelState();
+    PushThoraxDepthToMainPanel();
 
 }
 
@@ -171,12 +160,12 @@ void AARHUD::ValidateEditorAssignments() const
         );
     }
 
-    if (!DebugPanelClass)
+    if (!MainPanelClass)
     {
         UE_LOG(
             LogTemp,
             Warning,
-            TEXT("AARHUD: DebugPanelClass is null. Depth graph panel updates will not be visible.")
+            TEXT("AARHUD: MainPanelClass is null. Depth graph panel updates will not be visible.")
         );
     }
 
@@ -201,11 +190,11 @@ void AARHUD::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
 
-    IIDepthCamera* DepthCamera = DepthCameraProvider.GetInterface();
+    ICameraWithDepth* CameraWithDepth = CameraWithDepthProvider.GetInterface();
 
-    if (DepthMaterial && DepthCamera)
+    if (DepthMaterial && CameraWithDepth)
     {
-            if (UTexture* DepthTexture = DepthCamera->GetDepthTexture())
+            if (UTexture* DepthTexture = CameraWithDepth->GetDepthTexture())
             {
                 DepthMaterial->SetTextureParameterValue(DepthTextureParameterName, DepthTexture);
                 DepthMaterial->SetScalarParameterValue(DepthNearMetersParameterName, DepthNearMeters);
@@ -217,9 +206,9 @@ void AARHUD::Tick(float DeltaSeconds)
             }
     }
 
-        if (CameraMaterial && DepthCamera)
+        if (CameraMaterial && CameraWithDepth)
     {
-            if (UTexture* CameraTexture = DepthCamera->GetCameraTexture())
+            if (UTexture* CameraTexture = CameraWithDepth->GetCameraTexture())
             {
                 CameraMaterial->SetTextureParameterValue(CameraTextureParameterName, CameraTexture);
             }
@@ -342,7 +331,7 @@ void AARHUD::Tick(float DeltaSeconds)
     LastThoraxDepthMillimeters = MeanDepthMillimeters;
     bHasThoraxDepthReading = true;
     RecordThoraxDepthSample(MeanDepthMillimeters);
-    PushThoraxDepthToDebugPanel();
+    PushThoraxDepthToMainPanel();
 
     if (bLogThoraxDepthMinMax)
     {
@@ -758,15 +747,15 @@ void AARHUD::UpdateDepthWidgetState()
     SceneDepthWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 }
 
-void AARHUD::UpdateDebugPanelState()
+void AARHUD::UpdateMainPanelState()
 {
-    if (!DebugPanelWidget)
+    if (!MainPanelWidget)
     {
         return;
     }
 
-    DebugPanelWidget->SetVisibility(
-        bShowDebugPanel ? ESlateVisibility::Visible : ESlateVisibility::Collapsed
+    MainPanelWidget->SetVisibility(
+        bShowMainPanel ? ESlateVisibility::Visible : ESlateVisibility::Collapsed
     );
 }
 
@@ -884,14 +873,14 @@ void AARHUD::RecordThoraxDepthSample(const int32 DepthMillimeters)
     }
 }
 
-void AARHUD::PushThoraxDepthToDebugPanel()
+void AARHUD::PushThoraxDepthToMainPanel()
 {
-    if (!DebugPanelWidget || DebugPanelDepthUpdateFunctionName.IsNone())
+    if (!MainPanelWidget || MainPanelDepthUpdateFunctionName.IsNone())
     {
         return;
     }
 
-    UFunction* UpdateFunction = DebugPanelWidget->FindFunction(DebugPanelDepthUpdateFunctionName);
+    UFunction* UpdateFunction = MainPanelWidget->FindFunction(MainPanelDepthUpdateFunctionName);
     if (!UpdateFunction)
     {
         if (!bLoggedMissingDepthGraphFunction)
@@ -899,8 +888,8 @@ void AARHUD::PushThoraxDepthToDebugPanel()
             UE_LOG(
                 LogTemp,
                 Warning,
-                TEXT("AARHUD: Debug panel function '%s' not found. Add it in WBP_DebugPanel to receive depth graph updates."),
-                *DebugPanelDepthUpdateFunctionName.ToString()
+                TEXT("AARHUD: Debug panel function '%s' not found. Add it in WBP_MainPanel to receive depth graph updates."),
+                *MainPanelDepthUpdateFunctionName.ToString()
             );
             bLoggedMissingDepthGraphFunction = true;
         }
@@ -921,7 +910,7 @@ void AARHUD::PushThoraxDepthToDebugPanel()
     Params.CurrentDepthMillimeters = LastThoraxDepthMillimeters;
     Params.bHasDepth = bHasThoraxDepthReading;
 
-    DebugPanelWidget->ProcessEvent(UpdateFunction, &Params);
+    MainPanelWidget->ProcessEvent(UpdateFunction, &Params);
 }
 
 FVector2D AARHUD::ToScreenSpace(float X, float Y) const

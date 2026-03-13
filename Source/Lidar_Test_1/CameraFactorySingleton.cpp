@@ -3,7 +3,7 @@
 
 #include "CameraFactorySingleton.h"
 #include "ARUnrealCamera.h"
-#include "IDepthCamera.h"
+#include "ICameraWithDepth.h"
 
 // Definizione dei dispositivi supportati
 const TArray<FString> CameraFactorySingleton::SupportedCameraTypes = {
@@ -16,16 +16,16 @@ CameraFactorySingleton& CameraFactorySingleton::GetInstance()
     return SingletonInstance;
 }
 
-TScriptInterface<IIDepthCamera> CameraFactorySingleton::CreateCamera(const FString& TypeName, UObject* Outer)
+TScriptInterface<ICameraWithDepth> CameraFactorySingleton::CreateCamera(const FString& TypeName, UObject* Outer)
 {
-    TScriptInterface<IIDepthCamera> Camera;
+    TScriptInterface<ICameraWithDepth> Camera;
     UObject* EffectiveOuter = Outer ? Outer : GetTransientPackage();
 
     if (TypeName.Equals(TEXT("Unreal"), ESearchCase::IgnoreCase))
     {
         UARUnrealCamera* Provider = NewObject<UARUnrealCamera>(EffectiveOuter);
         Camera.SetObject(Provider);
-        Camera.SetInterface(Cast<IIDepthCamera>(Provider));
+        Camera.SetInterface(Cast<ICameraWithDepth>(Provider));
     }
     else
     {

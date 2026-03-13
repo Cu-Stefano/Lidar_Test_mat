@@ -3,7 +3,7 @@
 #pragma once
 
 #include "UObject/ScriptInterface.h"
-#include "IDepthCamera.h"
+#include "ICameraWithDepth.h"
 
 class LIDAR_TEST_1_API CameraFactorySingleton
 {
@@ -14,7 +14,7 @@ public:
      */
     static CameraFactorySingleton& GetInstance();
     
-    TScriptInterface<IIDepthCamera> CreateCamera(const FString& TypeName, UObject* Outer = nullptr);
+    TScriptInterface<ICameraWithDepth> CreateCamera(const FString& TypeName, UObject* Outer = nullptr);
 
     bool IsTypeSupported(const FString& TypeName) const;
 

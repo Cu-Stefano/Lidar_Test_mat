@@ -4,12 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
-#include "IDepthCamera.h"
+#include "ICameraWithDepth.h"
 #include "ARUnrealCamera.generated.h"
 
 
 UCLASS()
-class LIDAR_TEST_1_API UARUnrealCamera : public UObject, public IIDepthCamera
+class LIDAR_TEST_1_API UARUnrealCamera : public UObject, public ICameraWithDepth
 {
 	GENERATED_BODY()
 

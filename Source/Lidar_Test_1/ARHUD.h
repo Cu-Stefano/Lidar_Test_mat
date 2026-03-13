@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
 #include "UObject/ScriptInterface.h"
-#include "IDepthCamera.h"
+#include "ICameraWithDepth.h"
 #include "IPoseDetector.h"
 #include "ARHUD.generated.h"
 
@@ -43,13 +43,13 @@ protected:
     TObjectPtr<UUserWidget> SceneDepthWidget = nullptr;
 
     UPROPERTY(EditDefaultsOnly, Category="UI")
-    TSubclassOf<UUserWidget> DebugPanelClass;
+    TSubclassOf<UUserWidget> MainPanelClass;
 
     UPROPERTY(Transient)
-    TObjectPtr<UUserWidget> DebugPanelWidget = nullptr;
+    TObjectPtr<UUserWidget> MainPanelWidget = nullptr;
 
-    UPROPERTY(EditAnywhere, Category="UI|DebugPanel")
-    bool bShowDebugPanel = true;
+    UPROPERTY(EditAnywhere, Category="UI|MainPanel")
+    bool bShowMainPanel = true;
 
     UPROPERTY(EditAnywhere, Category="UI|DepthToggle")
     bool bShowDepthOverlay = false;
@@ -69,7 +69,7 @@ protected:
     UPROPERTY(EditAnywhere, Category="UI|DepthToggle")
     FLinearColor DepthToggleButtonOffColor = FLinearColor(0.15f, 0.15f, 0.15f, 0.90f);
 
-    // ================= UI =================
+    // ================= Rendering =================
     UPROPERTY(EditAnywhere, Category="UI")
     TObjectPtr<UTextureRenderTarget2D> CameraRenderTarget = nullptr;
 
@@ -77,7 +77,7 @@ protected:
     TScriptInterface<IIPoseDetector> PoseDetectorProvider;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="UI")
-    TScriptInterface<IIDepthCamera> DepthCameraProvider;
+    TScriptInterface<ICameraWithDepth> CameraWithDepthProvider;
 
     // ================= Materiali =================
     UPROPERTY(EditAnywhere, Category="UI")
@@ -243,7 +243,7 @@ protected:
     int32 ThoraxDepthHistoryMaxSamples = 700;
 
     UPROPERTY(EditAnywhere, Category="UI|DepthGraph")
-    FName DebugPanelDepthUpdateFunctionName = TEXT("UpdateThoraxDepthGraph");
+    FName MainPanelDepthUpdateFunctionName = TEXT("UpdateThoraxDepthGraph");
 
     UPROPERTY(EditAnywhere, Category="UI|DepthGraph")
     bool bEnableThoraxDepthGraphUpdates = true;
@@ -258,13 +258,13 @@ private:
     void ValidateEditorAssignments() const;
     void PushMaterialToWidget(UMaterialInterface* Material);
     void UpdateDepthWidgetState();
-    void UpdateDebugPanelState();
+    void UpdateMainPanelState();
     void DrawDepthToggleButton();
     void DrawChestSamplingArea();
     FVector2D ToScreenSpace(float X, float Y) const;
     void DrawJointsOverlay();
     void RecordThoraxDepthSample(int32 DepthMillimeters);
-    void PushThoraxDepthToDebugPanel();
+    void PushThoraxDepthToMainPanel();
     bool TryGetThoraxBoundsUV(const TArray<FPoseJoint>& Joints, FVector2D& OutMinUV, FVector2D& OutMaxUV) const;
     bool ComputeDepthMeanInBoundsUV(
         const FVector2D& MinUV,
