@@ -6,14 +6,13 @@
 #include "GameFramework/HUD.h"
 #include "UObject/ScriptInterface.h"
 #include "IDepthCamera.h"
-#include "PoseDetectionComponent.h"
+#include "IPoseDetector.h"
 #include "ARHUD.generated.h"
 
 class UUserWidget;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class UTextureRenderTarget2D;
-class UPoseDetectionComponent;
 class UFont;
 
 /**
@@ -75,7 +74,7 @@ protected:
     TObjectPtr<UTextureRenderTarget2D> CameraRenderTarget = nullptr;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="UI")
-    TObjectPtr<UPoseDetectionComponent> PoseDetectionComponent = nullptr; // TO MAKE ABSTRACT
+    TScriptInterface<IIPoseDetector> PoseDetectorProvider;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="UI")
     TScriptInterface<IIDepthCamera> DepthCameraProvider;

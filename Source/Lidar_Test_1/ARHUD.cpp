@@ -9,9 +9,10 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Kismet/KismetRenderingLibrary.h"
-#include "PoseDetectionComponent.h"
+#include "DefaultPoseDetector.h"
 #include "BodyPoseManager.h"
 #include "CameraFactorySingleton.h"
+#include "PoseComponentFactorySingleton.h"
 #include "IDepthCamera.h"
 
 namespace
@@ -70,13 +71,20 @@ EThoraxJointRole ResolveThoraxJointRole(const FString& RawName)
 AARHUD::AARHUD()
 {
     PrimaryActorTick.bCanEverTick = true;
-    PoseDetectionComponent = CreateDefaultSubobject<UPoseDetectionComponent>(TEXT("PoseDetectionComponent"));
 }
 
 void AARHUD::BeginPlay()
 {
     Super::BeginPlay();
     ValidateEditorAssignments();
+
+    PoseComponentFactorySingleton& PoseFactory = PoseComponentFactorySingleton::GetInstance();
+    PoseDetectorProvider = PoseFactory.CreatePoseComponent(TEXT("Default"), this);
+
+    if (!PoseDetectorProvider.GetObject())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("AARHUD: PoseDetectorProvider creation failed."));
+    }
 
     CameraFactorySingleton& Factory = CameraFactorySingleton::GetInstance();
     DepthCameraProvider = Factory.CreateCamera(TEXT("Unreal"), this);
@@ -101,9 +109,9 @@ void AARHUD::BeginPlay()
         DepthMaterial = UMaterialInstanceDynamic::Create(DepthMaterialBase, this);
     }
 
-    if (PoseDetectionComponent && CameraRenderTarget)
+    if (IIPoseDetector* PD = PoseDetectorProvider.GetInterface(); PD && CameraRenderTarget)
     {
-        PoseDetectionComponent->SetRenderTarget(CameraRenderTarget);
+        PD->SetRenderTarget(CameraRenderTarget);
     }
     if (CameraMaterialBase)
     {
@@ -222,23 +230,25 @@ void AARHUD::Tick(float DeltaSeconds)
         UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, CameraRenderTarget, CameraMaterial);
     }
 
-    if (PoseDetectionComponent && CameraRenderTarget)
+    IIPoseDetector* PoseDetector = PoseDetectorProvider.GetInterface();
+
+    if (PoseDetector && CameraRenderTarget)
     {
-        PoseDetectionComponent->SetRenderTarget(CameraRenderTarget);
-        PoseDetectionComponent->PerformPoseDetectionOnFrame();
+        PoseDetector->SetRenderTarget(CameraRenderTarget);
+        PoseDetector->PerformPoseDetectionOnFrame();
     }
 
-    if (!PoseDetectionComponent || !PoseDetectionComponent->BodyPoseManager)
+    if (!PoseDetector)
     {
         bHasThoraxDepthReading = false;
         bHasActiveThoraxBounds = false;
         bSmoothedBoundsInitialized = false;
         bSmoothedDepthInitialized = false;
-        UE_LOG(LogTemp, Warning, TEXT("Thorax depth mean skipped: PoseDetectionComponent or BodyPoseManager not valid"));
+        UE_LOG(LogTemp, Warning, TEXT("Thorax depth mean skipped: PoseDetectorProvider not valid"));
         return;
     }
 
-    const TArray<FPoseJoint>& Joints = PoseDetectionComponent->BodyPoseManager->DetectedJoints;
+    const TArray<FPoseJoint>& Joints = PoseDetector->GetDetectedJoints();
     FVector2D ThoraxMinUV = FVector2D::ZeroVector;
     FVector2D ThoraxMaxUV = FVector2D::ZeroVector;
     if (!TryGetThoraxBoundsUV(Joints, ThoraxMinUV, ThoraxMaxUV))
@@ -374,7 +384,7 @@ void AARHUD::DrawHUD()
     DrawDepthToggleButton();
     DrawChestSamplingArea();
 
-    if (!Canvas || !PoseDetectionComponent || !PoseDetectionComponent->BodyPoseManager)
+    if (!Canvas || !PoseDetectorProvider.GetObject())
     {
         return;
     }
@@ -404,10 +414,10 @@ void AARHUD::DrawJointsOverlay()
         return;
     }
 
-    if (!PoseDetectionComponent)        return;
-    if (!PoseDetectionComponent->BodyPoseManager) return;
-    
-    const TArray<FPoseJoint>& Joints = PoseDetectionComponent->BodyPoseManager->DetectedJoints;
+    IIPoseDetector* PoseDetector = PoseDetectorProvider.GetInterface();
+    if (!PoseDetector) return;
+
+    const TArray<FPoseJoint>& Joints = PoseDetector->GetDetectedJoints();
     
     if (Joints.Num() == 0) return;
 

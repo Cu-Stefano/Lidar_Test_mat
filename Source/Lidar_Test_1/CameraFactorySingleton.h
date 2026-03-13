@@ -18,7 +18,6 @@ public:
 
     bool IsTypeSupported(const FString& TypeName) const;
 
-    UFUNCTION(BlueprintPure, Category = "Camera Factory")
     static TArray<FString> GetSupportedTypes();
 
 private:

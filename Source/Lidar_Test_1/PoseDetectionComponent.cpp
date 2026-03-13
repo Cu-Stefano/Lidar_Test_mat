@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "PoseDetectionComponent.h"
+#include "DefaultPoseDetector.h"
 #include "ImageUtils.h"
 #include "IImageWrapper.h"
 #include "IImageWrapperModule.h"
@@ -10,34 +10,14 @@
 #include "Engine/TextureRenderTarget2D.h"
 
 
-// Sets default values for this component's properties
-UPoseDetectionComponent::UPoseDetectionComponent()
+// Sets default values for this object's properties
+UDefaultPoseDetector::UDefaultPoseDetector()
 {
-	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
-	// off to improve performance if you don't need them.
-	PrimaryComponentTick.bCanEverTick = true;
-    
-
-	// ...
-}
-
-// Called when the game starts
-void UPoseDetectionComponent::BeginPlay()
-{
-    Super::BeginPlay();
-
-    BodyPoseManager = NewObject<UBodyPoseManager>(this);
+    BodyPoseManager = CreateDefaultSubobject<UBodyPoseManager>(TEXT("BodyPoseManager"));
     bSavedCameraFrameOnce = false;
 }
 
-
-// Called every frame
-void UPoseDetectionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
-{
-    Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-}
-
-void UPoseDetectionComponent::PerformPoseDetectionOnFrame() const
+void UDefaultPoseDetector::PerformPoseDetectionOnFrame() const
 {
     if (!BodyPoseManager)
     {
@@ -63,26 +43,19 @@ void UPoseDetectionComponent::PerformPoseDetectionOnFrame() const
         UE_LOG(LogTemp, Warning, TEXT("Saved first camera frame PNG (see full path in previous log line)"));
     }
 
-    if (bPoseInputForceOpaqueAlpha)
-    {
-        for (int32 i = 0; i < RawBytes.Num(); i += 4)
-        {
-            if (bPoseInputForceOpaqueAlpha)
-            {
-                RawBytes[i + 3] = 255;
-            }
-        }
-    }
+    // ForceOpaqueAlpha
+    for (int32 i = 0; i < RawBytes.Num(); i += 4)
+        RawBytes[i + 3] = 255;
 
     BodyPoseManager->PerformPoseDetection(RawBytes, Width, Height);
 }
 
-void UPoseDetectionComponent::SetRenderTarget(UTextureRenderTarget2D* InRenderTarget)
+void UDefaultPoseDetector::SetRenderTarget(UTextureRenderTarget2D* InRenderTarget)
 {
     RenderTarget = InRenderTarget;
 }
 
-TArray<uint8> UPoseDetectionComponent::GetRenderTargetBytes() const
+TArray<uint8> UDefaultPoseDetector::GetRenderTargetBytes() const
 {
     if (!RenderTarget)
     {
@@ -125,7 +98,7 @@ TArray<uint8> UPoseDetectionComponent::GetRenderTargetBytes() const
     return RGBABytes;
 }
 
-void UPoseDetectionComponent::SaveRenderTargetToPNG() const
+void UDefaultPoseDetector::SaveRenderTargetToPNG() const
 {
     if (!RenderTarget) return;
 
@@ -167,12 +140,22 @@ void UPoseDetectionComponent::SaveRenderTargetToPNG() const
     }
 }
 
-int32 UPoseDetectionComponent::GetRenderTargetWidth() const
+int32 UDefaultPoseDetector::GetRenderTargetWidth() const
 {
     return RenderTarget ? RenderTarget->SizeX : 0;
 }
 
-int32 UPoseDetectionComponent::GetRenderTargetHeight() const
+int32 UDefaultPoseDetector::GetRenderTargetHeight() const
 {
     return RenderTarget ? RenderTarget->SizeY : 0;
+}
+
+const TArray<FPoseJoint>& UDefaultPoseDetector::GetDetectedJoints() const
+{
+    if (BodyPoseManager)
+    {
+        return BodyPoseManager->DetectedJoints;
+    }
+    static const TArray<FPoseJoint> EmptyJoints;
+    return EmptyJoints;
 }
