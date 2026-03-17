@@ -212,6 +212,11 @@ protected:
     UPROPERTY(Transient)
     bool bSmoothedDepthInitialized = false;
 
+    // Sub-unit error diffusion remainder — carries fractional precision between samples
+    // so that slow EMA drifts smaller than 1 quantization unit still increment the stored
+    // int32 value in proportion, eliminating artificial flat segments in the graph.
+    float DepthSubUnitRemainder = 0.0f;
+
     UPROPERTY(Transient)
     FVector2D SmoothedThoraxMinUV = FVector2D::ZeroVector;
 
@@ -263,7 +268,7 @@ private:
     void DrawChestSamplingArea();
     FVector2D ToScreenSpace(float X, float Y) const;
     void DrawJointsOverlay();
-    void RecordThoraxDepthSample(int32 DepthMillimeters);
+    void RecordThoraxDepthSample(float DepthUnits);
     void PushThoraxDepthToMainPanel();
     bool TryGetThoraxBoundsUV(const TArray<FPoseJoint>& Joints, FVector2D& OutMinUV, FVector2D& OutMaxUV) const;
     bool ComputeDepthMeanInBoundsUV(

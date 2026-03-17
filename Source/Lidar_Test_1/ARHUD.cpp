@@ -233,6 +233,7 @@ void AARHUD::Tick(float DeltaSeconds)
         bHasActiveThoraxBounds = false;
         bSmoothedBoundsInitialized = false;
         bSmoothedDepthInitialized = false;
+        DepthSubUnitRemainder = 0.0f;
         UE_LOG(LogTemp, Warning, TEXT("Thorax depth mean skipped: PoseDetectorProvider not valid"));
         return;
     }
@@ -284,6 +285,7 @@ void AARHUD::Tick(float DeltaSeconds)
         bHasThoraxDepthReading = false;
         bHasActiveThoraxBounds = false;
         bSmoothedDepthInitialized = false;
+        DepthSubUnitRemainder = 0.0f;
         UE_LOG(
             LogTemp,
             Warning,
@@ -324,13 +326,16 @@ void AARHUD::Tick(float DeltaSeconds)
     const float MeanDepthMeters = MaterialValueToMeters(MeanDepthValue);
     const float MinDepthMeters = MaterialValueToMeters(MinDepthValue);
     const float MaxDepthMeters = MaterialValueToMeters(MaxDepthValue);
-    const int32 MeanDepthMillimeters = FMath::RoundToInt(MeanDepthMeters * 10000.0f);
+    // Keep full float precision here; RoundToInt is deferred to RecordThoraxDepthSample
+    // where error diffusion is applied so sub-unit EMA drifts don't produce flat graph segments.
+    const float MeanDepthUnits = MeanDepthMeters * 10000.0f;
+    const int32 MeanDepthMillimeters = FMath::RoundToInt(MeanDepthUnits);
     const int32 MinDepthMillimeters = FMath::RoundToInt(MinDepthMeters * 10000.0f);
     const int32 MaxDepthMillimeters = FMath::RoundToInt(MaxDepthMeters * 10000.0f);
 
     LastThoraxDepthMillimeters = MeanDepthMillimeters;
     bHasThoraxDepthReading = true;
-    RecordThoraxDepthSample(MeanDepthMillimeters);
+    RecordThoraxDepthSample(MeanDepthUnits);
     PushThoraxDepthToMainPanel();
 
     if (bLogThoraxDepthMinMax)
@@ -861,9 +866,13 @@ void AARHUD::DrawChestSamplingArea()
     }
 }
 
-void AARHUD::RecordThoraxDepthSample(const int32 DepthMillimeters)
+void AARHUD::RecordThoraxDepthSample(const float DepthUnits)
 {
-    ThoraxDepthHistoryMillimeters.Add(DepthMillimeters);
+    const float AdjustedUnits = DepthUnits + DepthSubUnitRemainder;
+    const int32 RoundedUnits = FMath::RoundToInt(AdjustedUnits);
+    DepthSubUnitRemainder = FMath::Clamp(AdjustedUnits - static_cast<float>(RoundedUnits), -2.0f, 2.0f);
+
+    ThoraxDepthHistoryMillimeters.Add(RoundedUnits);
 
     const int32 MaxSamples = FMath::Max(1, ThoraxDepthHistoryMaxSamples);
     if (ThoraxDepthHistoryMillimeters.Num() > MaxSamples)
