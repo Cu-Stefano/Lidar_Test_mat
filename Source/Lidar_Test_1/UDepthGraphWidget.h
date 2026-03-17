@@ -45,28 +45,26 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style")
 	FLinearColor CurrentPointColor = FLinearColor(0.95f, 0.95f, 0.95f, 1.00f);
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style")
+	FLinearColor RecentRedExtremsColor = FLinearColor(1.00f, 0.20f, 0.20f, 1.00f);
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style", meta=(ClampMin="0.5", ClampMax="6.0"))
 	float LineThickness = 2.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style", meta=(ClampMin="1.0", ClampMax="20.0"))
 	float CurrentPointSize = 5.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style", meta=(ClampMin="16", ClampMax="512"))
-	int32 MaxRenderedSamples = 160;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style", meta=(ClampMin="2.0", ClampMax="24.0"))
+	float RecentRedExtremsMarkerSize = 8.0f;
 
-	// ---- Y-axis fixed range ----
-	// Se true, MinDepth/MaxDepth vengono forzati ai valori sotto invece di essere
-	// calcolati automaticamente dai campioni.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis")
-	bool bUseFixedYRange = true;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis",
-	          meta=(EditCondition="bUseFixedYRange", ClampMin="0", ClampMax="20000"))
-	int32 FixedYMinMillimeters = 900;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style", meta=(ClampMin="16", ClampMax="2000"))
+	int32 MaxHistorySamples = 500;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis",
-	          meta=(EditCondition="bUseFixedYRange", ClampMin="1", ClampMax="20000"))
-	int32 FixedYMaxMillimeters = 1200;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis", meta=(ClampMin="0", ClampMax="5000", UIMin="0", UIMax="200"))
+	int32 FixedYRangePaddingMillimeters = 30;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|RedExtrems", meta=(ClampMin="2", ClampMax="20000", UIMin="50", UIMax="5000"))
+	int32 RecentRedExtremsSampleWindow = 300;
 
 	UPROPERTY(BlueprintReadOnly, Category="Depth Graph|Data")
 	TArray<int32> DepthHistoryMillimeters;
@@ -76,4 +74,7 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, Category="Depth Graph|Data")
 	bool bHasDepth = false;
+
+private:
+	TArray<int32> RecentDepthMillimeters;
 };

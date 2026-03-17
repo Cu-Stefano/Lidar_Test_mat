@@ -13,18 +13,30 @@ void UUDepthGraphWidget::SetGraphData(const TArray<int32>& InDepthHistoryMillime
 	CurrentDepthMillimeters = InCurrentDepthMillimeters;
 	bHasDepth = bInHasDepth;
 
+	const double NowSeconds = FPlatformTime::Seconds();
+	if (bHasDepth)
+	{
+		RecentDepthMillimeters.Add(CurrentDepthMillimeters);
+	}
+
+	const int32 SampleWindow = FMath::Max(2, RecentRedExtremsSampleWindow);
+	while (RecentDepthMillimeters.Num() > SampleWindow)
+	{
+		RecentDepthMillimeters.RemoveAt(0, 1, false);
+	}
+
 	{
 		static double LastSetGraphDataLogSeconds = 0.0;
-		const double NowSeconds = FPlatformTime::Seconds();
 		if (NowSeconds - LastSetGraphDataLogSeconds > 0.5)
 		{
 			UE_LOG(
 				LogTemp,
 				Log,
-				TEXT("DepthGraphWidget: SetGraphData history=%d current=%d hasDepth=%s"),
+				TEXT("DepthGraphWidget: SetGraphData history=%d current=%d hasDepth=%s recent=%d"),
 				DepthHistoryMillimeters.Num(),
 				CurrentDepthMillimeters,
-				bHasDepth ? TEXT("true") : TEXT("false")
+				bHasDepth ? TEXT("true") : TEXT("false"),
+				RecentDepthMillimeters.Num()
 			);
 			LastSetGraphDataLogSeconds = NowSeconds;
 		}
@@ -90,6 +102,7 @@ int32 UUDepthGraphWidget::NativePaint(
 		return BaseLayer;
 	}
 
+	// Draw background
 	const FSlateBrush* WhiteBrush = FCoreStyle::Get().GetBrush(TEXT("WhiteBrush"));
 	const FPaintGeometry FullPaintGeometry = AllottedGeometry.ToPaintGeometry(
 		FVector2f(static_cast<float>(WidgetSize.X), static_cast<float>(WidgetSize.Y)),
@@ -178,10 +191,11 @@ int32 UUDepthGraphWidget::NativePaint(
 	}
 
 	const int32 TotalSamples = DepthHistoryMillimeters.Num();
-	const int32 MaxSamples = FMath::Max(2, MaxRenderedSamples);
+	const int32 MaxSamples = FMath::Max(2, MaxHistorySamples);
 	const int32 SamplesToDraw = FMath::Min(TotalSamples, MaxSamples);
 	const int32 StartIndex = TotalSamples - SamplesToDraw;
 
+	// scale graph based on Max e Min value
 	int32 MinDepth = TNumericLimits<int32>::Max();
 	int32 MaxDepth = TNumericLimits<int32>::Lowest();
 	for (int32 SampleIndex = StartIndex; SampleIndex < TotalSamples; ++SampleIndex)
@@ -191,17 +205,10 @@ int32 UUDepthGraphWidget::NativePaint(
 		MaxDepth = FMath::Max(MaxDepth, Value);
 	}
 
-	if (bUseFixedYRange)
-	{
-		constexpr int32 FixedRangePaddingMillimeters = 15;
-		MinDepth = FMath::Max(0, MinDepth - FixedRangePaddingMillimeters);
-		MaxDepth = MaxDepth + FixedRangePaddingMillimeters;
-		if (MinDepth == MaxDepth)
-		{
-			MaxDepth = MinDepth + 1;
-		}
-	}
-	else if (MinDepth == MaxDepth)
+	// add padding to top and bottom (max Y e min Y) of graph
+	MinDepth = FMath::Max(0, MinDepth - FixedYRangePaddingMillimeters);
+	MaxDepth = MaxDepth + FixedYRangePaddingMillimeters;
+	if (MinDepth == MaxDepth)
 	{
 		MaxDepth = MinDepth + 1;
 	}
@@ -286,6 +293,67 @@ int32 UUDepthGraphWidget::NativePaint(
 		false,
 		LineThickness
 	);
+
+	if (RecentDepthMillimeters.Num() > 0)
+	{
+		int32 RecentMinDepth = TNumericLimits<int32>::Max();
+		int32 RecentMaxDepth = TNumericLimits<int32>::Lowest();
+		for (const int32 DepthMm : RecentDepthMillimeters)
+		{
+			RecentMinDepth = FMath::Min(RecentMinDepth, DepthMm);
+			RecentMaxDepth = FMath::Max(RecentMaxDepth, DepthMm);
+		}
+
+		const auto DepthToPlotY = [&](const int32 DepthMm)
+		{
+			const float NormalizedDepth = FMath::Clamp(
+				(static_cast<float>(DepthMm - MinDepth)) / DepthRange,
+				0.0f,
+				1.0f
+			);
+			return Bottom - NormalizedDepth * PlotHeight;
+		};
+
+		const auto DrawRedExtremsMarker = [&](const float Y)
+		{
+			const float MarkerHalf = RecentRedExtremsMarkerSize * 0.5f;
+			const float MarkerCenterX = Right - MarkerHalf - 1.0f;
+
+			FSlateDrawElement::MakeLines(
+				OutDrawElements,
+				BaseLayer + 4,
+				FullPaintGeometry,
+				{
+					FVector2D(MarkerCenterX - MarkerHalf, Y),
+					FVector2D(MarkerCenterX + MarkerHalf, Y)
+				},
+				ESlateDrawEffect::None,
+				RecentRedExtremsColor,
+				false,
+				2.0f
+			);
+
+			FSlateDrawElement::MakeBox(
+				OutDrawElements,
+				BaseLayer + 4,
+				AllottedGeometry.ToPaintGeometry(
+					FVector2f(3.0f, 3.0f),
+					FSlateLayoutTransform(
+						FVector2f(
+							static_cast<float>(MarkerCenterX - 1.5f),
+							static_cast<float>(Y - 1.5f)
+						)
+					)
+				),
+				WhiteBrush,
+				ESlateDrawEffect::None,
+				RecentRedExtremsColor
+			);
+		};
+
+		DrawRedExtremsMarker(DepthToPlotY(RecentMaxDepth));
+		DrawRedExtremsMarker(DepthToPlotY(RecentMinDepth));
+	}
 
 	if (GraphPoints.Num() > 0)
 	{
