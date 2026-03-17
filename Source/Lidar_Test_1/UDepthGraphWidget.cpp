@@ -13,6 +13,13 @@ void UUDepthGraphWidget::SetGraphData(const TArray<int32>& InDepthHistoryMillime
 	CurrentDepthMillimeters = InCurrentDepthMillimeters;
 	bHasDepth = bInHasDepth;
 
+	if (DepthHistoryMillimeters.Num() < LastPersistentMarkerTotalSamples)
+	{
+		PersistentRedExtremsMarkers.Reset();
+		LastPersistentMarkerTotalSamples = DepthHistoryMillimeters.Num();
+		SamplesSinceLastPersistentMarker = 0;
+	}
+
 	const double NowSeconds = FPlatformTime::Seconds();
 	if (bHasDepth)
 	{
@@ -266,14 +273,24 @@ int32 UUDepthGraphWidget::NativePaint(
 	GraphPoints.Reserve(SamplesToDraw);
 
 	const float DepthRange = static_cast<float>(MaxDepth - MinDepth);
+	const float SmoothingAlpha = FMath::Clamp(DepthSmoothingAlpha, 0.01f, 1.0f);
+	float PreviousSmoothedDepth = SamplesToDraw > 0
+		? static_cast<float>(DepthHistoryMillimeters[StartIndex])
+		: 0.0f;
+
 	for (int32 LocalIndex = 0; LocalIndex < SamplesToDraw; ++LocalIndex)
 	{
-		const int32 SampleValue = DepthHistoryMillimeters[StartIndex + LocalIndex];
+		const float RawSampleValue = static_cast<float>(DepthHistoryMillimeters[StartIndex + LocalIndex]);
+		const float SmoothedValue = bEnableDepthSmoothing
+			? FMath::Lerp(PreviousSmoothedDepth, RawSampleValue, SmoothingAlpha)
+			: RawSampleValue;
+		PreviousSmoothedDepth = SmoothedValue;
+
 		const float AlphaX = SamplesToDraw > 1
 			? static_cast<float>(LocalIndex) / static_cast<float>(SamplesToDraw - 1)
 			: 0.0f;
 		const float NormalizedDepth = FMath::Clamp(
-			(static_cast<float>(SampleValue - MinDepth)) / DepthRange,
+			(SmoothedValue - static_cast<float>(MinDepth)) / DepthRange,
 			0.0f,
 			1.0f
 		);
@@ -294,65 +311,131 @@ int32 UUDepthGraphWidget::NativePaint(
 		LineThickness
 	);
 
-	if (RecentDepthMillimeters.Num() > 0)
+	const auto DepthToPlotY = [&](const int32 DepthMm)
 	{
-		int32 RecentMinDepth = TNumericLimits<int32>::Max();
-		int32 RecentMaxDepth = TNumericLimits<int32>::Lowest();
-		for (const int32 DepthMm : RecentDepthMillimeters)
+		const float NormalizedDepth = FMath::Clamp(
+			(static_cast<float>(DepthMm - MinDepth)) / DepthRange,
+			0.0f,
+			1.0f
+		);
+		return Bottom - NormalizedDepth * PlotHeight;
+	};
+
+	const auto SampleIndexToPlotX = [&](const int32 SampleIndex)
+	{
+		if (SamplesToDraw <= 1)
 		{
-			RecentMinDepth = FMath::Min(RecentMinDepth, DepthMm);
-			RecentMaxDepth = FMath::Max(RecentMaxDepth, DepthMm);
+			return Left;
 		}
 
-		const auto DepthToPlotY = [&](const int32 DepthMm)
-		{
-			const float NormalizedDepth = FMath::Clamp(
-				(static_cast<float>(DepthMm - MinDepth)) / DepthRange,
-				0.0f,
-				1.0f
-			);
-			return Bottom - NormalizedDepth * PlotHeight;
-		};
+		const int32 LocalIndex = SampleIndex - StartIndex;
+		const float AlphaX = static_cast<float>(LocalIndex) / static_cast<float>(SamplesToDraw - 1);
+		return Left + AlphaX * PlotWidth;
+	};
 
-		const auto DrawRedExtremsMarker = [&](const float Y)
-		{
-			const float MarkerHalf = RecentRedExtremsMarkerSize * 0.5f;
-			const float MarkerCenterX = Right - MarkerHalf - 1.0f;
+	const auto DrawRedExtremsMarker = [&](const float X, const float Y)
+	{
+		const float MarkerHalf = RecentRedExtremsMarkerSize * 0.5f;
 
-			FSlateDrawElement::MakeLines(
-				OutDrawElements,
-				BaseLayer + 4,
-				FullPaintGeometry,
-				{
-					FVector2D(MarkerCenterX - MarkerHalf, Y),
-					FVector2D(MarkerCenterX + MarkerHalf, Y)
-				},
-				ESlateDrawEffect::None,
-				RecentRedExtremsColor,
-				false,
-				2.0f
-			);
+		FSlateDrawElement::MakeLines(
+			OutDrawElements,
+			BaseLayer + 4,
+			FullPaintGeometry,
+			{
+				FVector2D(X, Y - MarkerHalf),
+				FVector2D(X, Y + MarkerHalf)
+			},
+			ESlateDrawEffect::None,
+			RecentRedExtremsColor,
+			false,
+			2.0f
+		);
 
-			FSlateDrawElement::MakeBox(
-				OutDrawElements,
-				BaseLayer + 4,
-				AllottedGeometry.ToPaintGeometry(
-					FVector2f(3.0f, 3.0f),
-					FSlateLayoutTransform(
-						FVector2f(
-							static_cast<float>(MarkerCenterX - 1.5f),
-							static_cast<float>(Y - 1.5f)
-						)
+		FSlateDrawElement::MakeBox(
+			OutDrawElements,
+			BaseLayer + 4,
+			AllottedGeometry.ToPaintGeometry(
+				FVector2f(3.0f, 3.0f),
+				FSlateLayoutTransform(
+					FVector2f(
+						static_cast<float>(X - 1.5f),
+						static_cast<float>(Y - 1.5f)
 					)
-				),
-				WhiteBrush,
-				ESlateDrawEffect::None,
-				RecentRedExtremsColor
-			);
-		};
+				)
+			),
+			WhiteBrush,
+			ESlateDrawEffect::None,
+			RecentRedExtremsColor
+		);
+	};
 
-		DrawRedExtremsMarker(DepthToPlotY(RecentMaxDepth));
-		DrawRedExtremsMarker(DepthToPlotY(RecentMinDepth));
+	if (TotalSamples < LastPersistentMarkerTotalSamples)
+	{
+		PersistentRedExtremsMarkers.Reset();
+		LastPersistentMarkerTotalSamples = TotalSamples;
+		SamplesSinceLastPersistentMarker = 0;
+	}
+
+	const int32 NewSamples = FMath::Max(0, TotalSamples - LastPersistentMarkerTotalSamples);
+	LastPersistentMarkerTotalSamples = TotalSamples;
+	SamplesSinceLastPersistentMarker += NewSamples;
+
+	const int32 AddEverySamples = FMath::Max(1, RecentRedExtremsAddEverySamples);
+	if (SamplesSinceLastPersistentMarker >= AddEverySamples && SamplesToDraw > 0)
+	{
+		const int32 RecentWindowStartIndex = FMath::Max(StartIndex, TotalSamples - FMath::Max(1, RecentRedExtremsSampleWindow));
+
+		int32 RecentMinDepth = TNumericLimits<int32>::Max();
+		int32 RecentMaxDepth = TNumericLimits<int32>::Lowest();
+		int32 RecentMinSampleIndex = INDEX_NONE;
+		int32 RecentMaxSampleIndex = INDEX_NONE;
+
+		for (int32 SampleIndex = RecentWindowStartIndex; SampleIndex < TotalSamples; ++SampleIndex)
+		{
+			const int32 DepthMm = DepthHistoryMillimeters[SampleIndex];
+			if (DepthMm <= RecentMinDepth)
+			{
+				RecentMinDepth = DepthMm;
+				RecentMinSampleIndex = SampleIndex;
+			}
+
+			if (DepthMm >= RecentMaxDepth)
+			{
+				RecentMaxDepth = DepthMm;
+				RecentMaxSampleIndex = SampleIndex;
+			}
+		}
+
+		if (RecentMaxSampleIndex != INDEX_NONE)
+		{
+			PersistentRedExtremsMarkers.Add(FIntPoint(RecentMaxSampleIndex, RecentMaxDepth));
+		}
+
+		if (RecentMinSampleIndex != INDEX_NONE)
+		{
+			PersistentRedExtremsMarkers.Add(FIntPoint(RecentMinSampleIndex, RecentMinDepth));
+		}
+
+		SamplesSinceLastPersistentMarker %= AddEverySamples;
+	}
+
+	const int32 MaxMarkers = FMath::Max(2, MaxPersistentRedExtremsMarkers);
+	while (PersistentRedExtremsMarkers.Num() > MaxMarkers)
+	{
+		PersistentRedExtremsMarkers.RemoveAt(0, 1, false);
+	}
+
+	for (const FIntPoint& MarkerPoint : PersistentRedExtremsMarkers)
+	{
+		if (MarkerPoint.X < StartIndex || MarkerPoint.X >= TotalSamples)
+		{
+			continue;
+		}
+
+		DrawRedExtremsMarker(
+			SampleIndexToPlotX(MarkerPoint.X),
+			DepthToPlotY(MarkerPoint.Y)
+		);
 	}
 
 	if (GraphPoints.Num() > 0)
