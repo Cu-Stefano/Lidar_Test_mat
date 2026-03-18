@@ -17,7 +17,7 @@ class LIDAR_TEST_1_API UUDepthGraphWidget : public UUserWidget
 
 public:
 	UFUNCTION(BlueprintCallable, Category="Depth Graph")
-	void SetGraphData(const TArray<int32>& InDepthHistoryMillimeters, int32 InCurrentDepthMillimeters, bool bInHasDepth);
+	void SetGraphData(const TArray<float>& InDepthHistoryMillimeters, float InCurrentDepthMillimeters, bool bInHasDepth);
 
 protected:
 	virtual int32 NativePaint(
@@ -54,8 +54,8 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style", meta=(ClampMin="16", ClampMax="2000"))
 	int32 MaxHistorySamples = 500;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis", meta=(ClampMin="0", ClampMax="5000", UIMin="0", UIMax="200"))
-	int32 FixedYRangePaddingMillimeters = 30;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis", meta=(ClampMin="0", ClampMax="5000", UIMin="0", UIMax="20000"))
+	float FixedYRangePaddingMillimeters = 1000.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|Smoothing")
 	bool bEnableDepthSmoothing = true;
@@ -64,10 +64,10 @@ protected:
 	float DepthSmoothingAlpha = 0.25f;
 
 	UPROPERTY(BlueprintReadOnly, Category="Depth Graph|Data")
-	TArray<int32> DepthHistoryMillimeters;
+	TArray<float> DepthHistoryMillimeters;
 
 	UPROPERTY(BlueprintReadOnly, Category="Depth Graph|Data")
-	int32 CurrentDepthMillimeters = 0;
+	float CurrentDepthMillimeters = 0.0f;
 
 	UPROPERTY(BlueprintReadOnly, Category="Depth Graph|Data")
 	bool bHasDepth = false;

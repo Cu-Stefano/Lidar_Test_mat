@@ -7,21 +7,21 @@
 #include "Rendering/DrawElements.h"
 #include "Styling/CoreStyle.h"
 
-void UUDepthGraphWidget::SetGraphData(const TArray<int32>& InDepthHistoryMillimeters, const int32 InCurrentDepthMillimeters, const bool bInHasDepth)
+void UUDepthGraphWidget::SetGraphData(const TArray<float>& InDepthHistoryMillimeters, const float InCurrentDepthMillimeters, const bool bInHasDepth)
 {
 	DepthHistoryMillimeters = InDepthHistoryMillimeters;
 	CurrentDepthMillimeters = InCurrentDepthMillimeters;
 	bHasDepth = bInHasDepth;
 
-	const double NowSeconds = FPlatformTime::Seconds();
+	const float NowSeconds = FPlatformTime::Seconds();
 	{
-		static double LastSetGraphDataLogSeconds = 0.0;
+		static float LastSetGraphDataLogSeconds = 0.0;
 		if (NowSeconds - LastSetGraphDataLogSeconds > 0.5)
 		{
 			UE_LOG(
 				LogTemp,
 				Log,
-				TEXT("DepthGraphWidget: SetGraphData history=%d current=%d hasDepth=%s"),
+				TEXT("DepthGraphWidget: SetGraphData history=%d current=%.6f hasDepth=%s"),
 				DepthHistoryMillimeters.Num(),
 				CurrentDepthMillimeters,
 				bHasDepth ? TEXT("true") : TEXT("false")
@@ -55,8 +55,8 @@ int32 UUDepthGraphWidget::NativePaint(
 
 	const FVector2D WidgetSize = AllottedGeometry.GetLocalSize();
 	{
-		static double LastNativePaintEntryLogSeconds = 0.0;
-		const double NowSeconds = FPlatformTime::Seconds();
+		static float LastNativePaintEntryLogSeconds = 0.0;
+		const float NowSeconds = FPlatformTime::Seconds();
 		if (NowSeconds - LastNativePaintEntryLogSeconds > 1.0)
 		{
 			UE_LOG(
@@ -74,8 +74,8 @@ int32 UUDepthGraphWidget::NativePaint(
 
 	if (WidgetSize.X <= 1.0f || WidgetSize.Y <= 1.0f)
 	{
-		static double LastTinySizeLogSeconds = 0.0;
-		const double NowSeconds = FPlatformTime::Seconds();
+		static float LastTinySizeLogSeconds = 0.0;
+		const float NowSeconds = FPlatformTime::Seconds();
 		if (NowSeconds - LastTinySizeLogSeconds > 1.0)
 		{
 			UE_LOG(
@@ -129,8 +129,8 @@ int32 UUDepthGraphWidget::NativePaint(
 
 	if (!bHasDepth || DepthHistoryMillimeters.Num() < 2)
 	{
-		static double LastNoDataPaintLogSeconds = 0.0;
-		const double NowSeconds = FPlatformTime::Seconds();
+		static float LastNoDataPaintLogSeconds = 0.0;
+		const float NowSeconds = FPlatformTime::Seconds();
 		if (NowSeconds - LastNoDataPaintLogSeconds > 1.0)
 		{
 			UE_LOG(
@@ -156,8 +156,8 @@ int32 UUDepthGraphWidget::NativePaint(
 
 	if (PlotWidth <= 2.0f || PlotHeight <= 2.0f)
 	{
-		static double LastSmallPlotLogSeconds = 0.0;
-		const double NowSeconds = FPlatformTime::Seconds();
+		static float LastSmallPlotLogSeconds = 0.0;
+		const float NowSeconds = FPlatformTime::Seconds();
 		if (NowSeconds - LastSmallPlotLogSeconds > 1.0)
 		{
 			UE_LOG(
@@ -184,24 +184,35 @@ int32 UUDepthGraphWidget::NativePaint(
 	const int32 StartIndex = TotalSamples - SamplesToDraw;
 
 	// scale graph based on Max e Min value
-	int32 MinDepth = TNumericLimits<int32>::Max();
-	int32 MaxDepth = TNumericLimits<int32>::Lowest();
+	float MinDepth = TNumericLimits<float>::Max();
+	float MaxDepth = TNumericLimits<float>::Lowest();
+	int32 ValidSamples = 0;
 	for (int32 SampleIndex = StartIndex; SampleIndex < TotalSamples; ++SampleIndex)
 	{
-		const int32 Value = DepthHistoryMillimeters[SampleIndex];
+		const float Value = DepthHistoryMillimeters[SampleIndex];
+		if (!FMath::IsFinite(Value))
+		{
+			continue;
+		}
 		MinDepth = FMath::Min(MinDepth, Value);
 		MaxDepth = FMath::Max(MaxDepth, Value);
+		++ValidSamples;
+	}
+
+	if (ValidSamples < 2)
+	{
+		return BaseLayer + 2;
 	}
 
 	// add padding to top and bottom (max Y e min Y) of graph
-	MinDepth = FMath::Max(0, MinDepth - FixedYRangePaddingMillimeters);
+	MinDepth = FMath::Max(0.0f, MinDepth - FixedYRangePaddingMillimeters);
 	MaxDepth = MaxDepth + FixedYRangePaddingMillimeters;
 	if (MinDepth == MaxDepth)
 	{
 		MaxDepth = MinDepth + 1;
 	}
 
-	const int32 MidDepth = (MinDepth + MaxDepth) / 2;
+	const float MidDepth = 0.5f * (MinDepth + MaxDepth);
 	const FSlateFontInfo AxisFontInfo = FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 10);
 	const FLinearColor AxisLabelColor(0.88f, 0.88f, 0.88f, 0.95f);
 	const FLinearColor AxisGuideColor(0.35f, 0.35f, 0.35f, 0.50f);
@@ -209,9 +220,9 @@ int32 UUDepthGraphWidget::NativePaint(
 	const float AxisTextX = GraphPadding.Left;
 	const float AxisTickStartX = Left - YAxisTickLength;
 
-	const auto DrawYAxisLabel = [&](const int32 Layer, const float Y, const int32 DepthMm)
+	const auto DrawYAxisLabel = [&](const int32 Layer, const float Y, const float DepthValue)
 	{
-		const FString Label = FString::Printf(TEXT("%d"), DepthMm);
+		const FString Label = FString::Printf(TEXT("%.3f"), DepthValue);
 		const FVector2f LabelPosition(
 			static_cast<float>(AxisTextX),
 			static_cast<float>(Y - 7.0f)
@@ -253,15 +264,19 @@ int32 UUDepthGraphWidget::NativePaint(
 	TArray<FVector2D> GraphPoints;
 	GraphPoints.Reserve(SamplesToDraw);
 
-	const float DepthRange = static_cast<float>(MaxDepth - MinDepth);
+	const float DepthRange = MaxDepth - MinDepth;
 	const float SmoothingAlpha = FMath::Clamp(DepthSmoothingAlpha, 0.01f, 1.0f);
 	float PreviousSmoothedDepth = SamplesToDraw > 0
-		? static_cast<float>(DepthHistoryMillimeters[StartIndex])
+		? DepthHistoryMillimeters[StartIndex]
 		: 0.0f;
 
 	for (int32 LocalIndex = 0; LocalIndex < SamplesToDraw; ++LocalIndex)
 	{
-		const float RawSampleValue = static_cast<float>(DepthHistoryMillimeters[StartIndex + LocalIndex]);
+		const float RawSampleValue = DepthHistoryMillimeters[StartIndex + LocalIndex];
+		if (!FMath::IsFinite(RawSampleValue))
+		{
+			continue;
+		}
 		const float SmoothedValue = bEnableDepthSmoothing
 			? FMath::Lerp(PreviousSmoothedDepth, RawSampleValue, SmoothingAlpha)
 			: RawSampleValue;
@@ -271,7 +286,7 @@ int32 UUDepthGraphWidget::NativePaint(
 			? static_cast<float>(LocalIndex) / static_cast<float>(SamplesToDraw - 1)
 			: 0.0f;
 		const float NormalizedDepth = FMath::Clamp(
-			(SmoothedValue - static_cast<float>(MinDepth)) / DepthRange,
+			(SmoothedValue - MinDepth) / DepthRange,
 			0.0f,
 			1.0f
 		);
@@ -314,14 +329,14 @@ int32 UUDepthGraphWidget::NativePaint(
 			CurrentPointColor
 		);
 
-		static double LastPaintOkLogSeconds = 0.0;
-		const double NowSeconds = FPlatformTime::Seconds();
+		static float LastPaintOkLogSeconds = 0.0;
+		const float NowSeconds = FPlatformTime::Seconds();
 		if (NowSeconds - LastPaintOkLogSeconds > 1.0)
 		{
 			UE_LOG(
 				LogTemp,
 				Log,
-				TEXT("DepthGraphWidget: NativePaint drew %d points (min=%d, max=%d, current=%d)"),
+				TEXT("DepthGraphWidget: NativePaint drew %d points (min=%.6f, max=%.6f, current=%.6f)"),
 				GraphPoints.Num(),
 				MinDepth,
 				MaxDepth,

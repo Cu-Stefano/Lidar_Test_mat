@@ -27,7 +27,7 @@ public:
     AARHUD();
 
     UFUNCTION(BlueprintCallable, Category="UI|DepthGraph")
-    void GetThoraxDepthHistory(TArray<int32>& OutHistoryMillimeters, int32& OutLatestDepthMillimeters, bool& bOutHasDepth) const;
+    void GetThoraxDepthHistory(TArray<float>& OutHistoryMillimeters, float& OutLatestDepthMillimeters, bool& bOutHasDepth) const;
 
 protected:
     virtual void BeginPlay() override;
@@ -172,7 +172,7 @@ protected:
     bool bLogThoraxDepthInMillimeters = true;
 
     UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
-    bool bUseFloat32DepthSampling = true;
+    bool bUseFloat32DepthSampling = false;
 
     // Reject depth readings when local sampling quality is poor.
     UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
@@ -187,44 +187,11 @@ protected:
     float MinValidDepthMeters = 0.05f;
 
     UPROPERTY(EditAnywhere, Category="Pose|DepthDebug", meta=(ClampMin="0.1", ClampMax="30.0"))
-    float MaxValidDepthMeters = 10.0f;
+    float MaxValidDepthMeters = 1000000000.0f;
 
     // Local standard deviation at this value or above is treated as low confidence.
     UPROPERTY(EditAnywhere, Category="Pose|DepthDebug", meta=(ClampMin="0.001", ClampMax="2.0"))
     float MaxDepthStdDevForConfidenceMeters = 0.18f;
-
-    // ================= Smoothing =================
-    UPROPERTY(EditAnywhere, Category="Pose|Smoothing")
-    bool bUseDepthSmoothing = true;
-
-    UPROPERTY(EditAnywhere, Category="Pose|Smoothing", meta=(ClampMin="0.01", ClampMax="1.0"))
-    float DepthSmoothingAlpha = 0.3f;
-
-    UPROPERTY(EditAnywhere, Category="Pose|Smoothing")
-    bool bSmoothThoraxBoundsUV = true;
-
-    UPROPERTY(EditAnywhere, Category="Pose|Smoothing", meta=(ClampMin="0.01", ClampMax="1.0"))
-    float ThoraxBoundsUVSmoothingAlpha = 0.02f;
-
-    UPROPERTY(Transient)
-    float SmoothedThoraxDepthValue = 0.0f;
-
-    UPROPERTY(Transient)
-    bool bSmoothedDepthInitialized = false;
-
-    // Sub-unit error diffusion remainder — carries fractional precision between samples
-    // so that slow EMA drifts smaller than 1 quantization unit still increment the stored
-    // int32 value in proportion, eliminating artificial flat segments in the graph.
-    float DepthSubUnitRemainder = 0.0f;
-
-    UPROPERTY(Transient)
-    FVector2D SmoothedThoraxMinUV = FVector2D::ZeroVector;
-
-    UPROPERTY(Transient)
-    FVector2D SmoothedThoraxMaxUV = FVector2D::ZeroVector;
-
-    UPROPERTY(Transient)
-    bool bSmoothedBoundsInitialized = false;
 
     UPROPERTY(Transient)
     FVector2D ActiveThoraxMinUV = FVector2D::ZeroVector;
@@ -239,7 +206,7 @@ protected:
     TObjectPtr<UTextureRenderTarget2D> DepthDebugRenderTarget = nullptr;
 
     UPROPERTY(Transient)
-    int32 LastThoraxDepthMillimeters = 0;
+    float LastThoraxDepthMillimeters = 0.0f;
 
     UPROPERTY(Transient)
     bool bHasThoraxDepthReading = false;
@@ -254,7 +221,7 @@ protected:
     bool bEnableThoraxDepthGraphUpdates = true;
 
     UPROPERTY(Transient)
-    TArray<int32> ThoraxDepthHistoryMillimeters;
+    TArray<float> ThoraxDepthHistoryMillimeters;
 
     UPROPERTY(Transient)
     bool bLoggedMissingDepthGraphFunction = false;

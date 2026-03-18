@@ -3,7 +3,9 @@
 
 #include "ARHUD.h"
 
+#include "Blueprint/WidgetTree.h"
 #include "Blueprint/UserWidget.h"
+#include "Components/Widget.h"
 #include "Engine/Canvas.h"
 #include "Engine/Font.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -14,6 +16,7 @@
 #include "CameraFactorySingleton.h"
 #include "PoseComponentFactorySingleton.h"
 #include "ICameraWithDepth.h"
+#include "UDepthGraphWidget.h"
 
 namespace
 {
@@ -52,6 +55,37 @@ EThoraxJointRole ResolveThoraxJointRole(const FString& RawName)
     }
 
     return EThoraxJointRole::Unknown;
+}
+
+UUDepthGraphWidget* FindDepthGraphWidget(UUserWidget* RootWidget)
+{
+    if (!RootWidget)
+    {
+        return nullptr;
+    }
+
+    if (UUDepthGraphWidget* DirectGraphWidget = Cast<UUDepthGraphWidget>(RootWidget))
+    {
+        return DirectGraphWidget;
+    }
+
+    UWidgetTree* Tree = RootWidget->WidgetTree;
+    if (!Tree)
+    {
+        return nullptr;
+    }
+
+    TArray<UWidget*> AllWidgets;
+    Tree->GetAllWidgets(AllWidgets);
+    for (UWidget* Widget : AllWidgets)
+    {
+        if (UUDepthGraphWidget* GraphWidget = Cast<UUDepthGraphWidget>(Widget))
+        {
+            return GraphWidget;
+        }
+    }
+
+    return nullptr;
 }
 }
 
@@ -179,7 +213,7 @@ void AARHUD::ValidateEditorAssignments() const
     }
 }
 
-void AARHUD::GetThoraxDepthHistory(TArray<int32>& OutHistoryMillimeters, int32& OutLatestDepthMillimeters, bool& bOutHasDepth) const
+void AARHUD::GetThoraxDepthHistory(TArray<float>& OutHistoryMillimeters, float& OutLatestDepthMillimeters, bool& bOutHasDepth) const
 {
     OutHistoryMillimeters = ThoraxDepthHistoryMillimeters;
     OutLatestDepthMillimeters = LastThoraxDepthMillimeters;
@@ -231,9 +265,6 @@ void AARHUD::Tick(float DeltaSeconds)
     {
         bHasThoraxDepthReading = false;
         bHasActiveThoraxBounds = false;
-        bSmoothedBoundsInitialized = false;
-        bSmoothedDepthInitialized = false;
-        DepthSubUnitRemainder = 0.0f;
         UE_LOG(LogTemp, Warning, TEXT("Thorax depth mean skipped: PoseDetectorProvider not valid"));
         return;
     }
@@ -245,28 +276,8 @@ void AARHUD::Tick(float DeltaSeconds)
     {
         bHasThoraxDepthReading = false;
         bHasActiveThoraxBounds = false;
-        bSmoothedBoundsInitialized = false;
         UE_LOG(LogTemp, Warning, TEXT("Thorax depth mean skipped: full thorax bounds not available (need both shoulders and hips)"));
         return;
-    }
-
-    if (bSmoothThoraxBoundsUV)
-    {
-        if (!bSmoothedBoundsInitialized)
-        {
-            SmoothedThoraxMinUV = ThoraxMinUV;
-            SmoothedThoraxMaxUV = ThoraxMaxUV;
-            bSmoothedBoundsInitialized = true;
-        }
-        else
-        {
-            const float BoundsAlpha = FMath::Clamp(ThoraxBoundsUVSmoothingAlpha, 0.01f, 1.0f);
-            SmoothedThoraxMinUV = FMath::Lerp(SmoothedThoraxMinUV, ThoraxMinUV, BoundsAlpha);
-            SmoothedThoraxMaxUV = FMath::Lerp(SmoothedThoraxMaxUV, ThoraxMaxUV, BoundsAlpha);
-        }
-
-        ThoraxMinUV = SmoothedThoraxMinUV;
-        ThoraxMaxUV = SmoothedThoraxMaxUV;
     }
 
     ActiveThoraxMinUV = ThoraxMinUV;
@@ -284,8 +295,6 @@ void AARHUD::Tick(float DeltaSeconds)
     {
         bHasThoraxDepthReading = false;
         bHasActiveThoraxBounds = false;
-        bSmoothedDepthInitialized = false;
-        DepthSubUnitRemainder = 0.0f;
         UE_LOG(
             LogTemp,
             Warning,
@@ -296,66 +305,29 @@ void AARHUD::Tick(float DeltaSeconds)
         return;
     }
 
-    if (bUseDepthSmoothing)
-    {
-        if (!bSmoothedDepthInitialized)
-        {
-            SmoothedThoraxDepthValue = MeanDepthValue;
-            bSmoothedDepthInitialized = true;
-        }
-        else
-        {
-            const float DepthAlpha = FMath::Clamp(DepthSmoothingAlpha, 0.01f, 1.0f);
-            SmoothedThoraxDepthValue = FMath::Lerp(SmoothedThoraxDepthValue, MeanDepthValue, DepthAlpha);
-        }
+    const float MeanDepthRaw = MeanDepthValue * 10000.0f;
+    const float MinDepthRaw = MinDepthValue * 10000.0f;
+    const float MaxDepthRaw = MaxDepthValue * 10000.0f;
 
-        MeanDepthValue = SmoothedThoraxDepthValue;
-    }
-
-    const float SafeFarMeters = FMath::Max(DepthNearMeters + KINDA_SMALL_NUMBER, DepthFarMeters);
-    const auto MaterialValueToMeters = [this, SafeFarMeters](const float DepthValue) -> float
-    {
-        if (bDepthMaterialValuesAreNormalized)
-        {
-            return FMath::Lerp(DepthNearMeters, SafeFarMeters, FMath::Clamp(DepthValue, 0.0f, 1.0f));
-        }
-
-        return FMath::Max(0.0f, DepthValue);
-    };
-
-    const float MeanDepthMeters = MaterialValueToMeters(MeanDepthValue);
-    const float MinDepthMeters = MaterialValueToMeters(MinDepthValue);
-    const float MaxDepthMeters = MaterialValueToMeters(MaxDepthValue);
-    // Keep full float precision here; RoundToInt is deferred to RecordThoraxDepthSample
-    // where error diffusion is applied so sub-unit EMA drifts don't produce flat graph segments.
-    const float MeanDepthUnits = MeanDepthMeters * 10000.0f;
-    const int32 MeanDepthMillimeters = FMath::RoundToInt(MeanDepthUnits);
-    const int32 MinDepthMillimeters = FMath::RoundToInt(MinDepthMeters * 10000.0f);
-    const int32 MaxDepthMillimeters = FMath::RoundToInt(MaxDepthMeters * 10000.0f);
-
-    LastThoraxDepthMillimeters = MeanDepthMillimeters;
+    LastThoraxDepthMillimeters = MeanDepthRaw;
     bHasThoraxDepthReading = true;
-    RecordThoraxDepthSample(MeanDepthUnits);
+    RecordThoraxDepthSample(MeanDepthRaw);
     PushThoraxDepthToMainPanel();
 
-    if (bLogThoraxDepthMinMax)
+    if (true)
     {
         if (bLogThoraxDepthInMillimeters)
         {
             UE_LOG(
                 LogTemp,
                 Log,
-                TEXT("Thorax depth mean: %d mm (%.3f m), min: %d mm, max: %d mm, samples=%d, uv=(%.3f, %.3f), normalized=%s, vizNear=%.2fm, vizFar=%.2fm"),
-                MeanDepthMillimeters,
-                MeanDepthMeters,
-                MinDepthMillimeters,
-                MaxDepthMillimeters,
+                TEXT("Thorax depth mean: %.6f, min: %.6f, max: %.6f, samples=%d, uv=(%.3f, %.3f)"),
+                MeanDepthRaw,
+                MinDepthRaw,
+                MaxDepthRaw,
                 SampleCount,
                 ThoraxCenterUV.X,
-                ThoraxCenterUV.Y,
-                bDepthMaterialValuesAreNormalized ? TEXT("true") : TEXT("false"),
-                DepthNearMeters,
-                SafeFarMeters
+                ThoraxCenterUV.Y
             );
 
             UE_LOG(
@@ -634,11 +606,10 @@ bool AARHUD::ComputeDepthMeanInBoundsUV(
     const int32 StartY = FMath::Clamp(FMath::RoundToInt(FMath::Min(MinUV.Y, MaxUV.Y) * static_cast<float>(Height - 1)), 0, Height - 1);
     const int32 EndY = FMath::Clamp(FMath::RoundToInt(FMath::Max(MinUV.Y, MaxUV.Y) * static_cast<float>(Height - 1)), 0, Height - 1);
 
-    const float SafeMaxValidDepthMeters = FMath::Max(MinValidDepthMeters + KINDA_SMALL_NUMBER, MaxValidDepthMeters);
-    const float SafeMaxStdDev = FMath::Max(0.001f, MaxDepthStdDevForConfidenceMeters);
-
-    double DepthSum = 0.0;
-    double DepthSquaredSum = 0.0;
+    const float SafeMaxStdDev = FMath::Max(0.001, MaxDepthStdDevForConfidenceMeters);
+ 
+    float DepthSum = 0.0;
+    float DepthSquaredSum = 0.0;
     int32 CandidateCount = 0;
     int32 Count = 0;
     float MinDepth = TNumericLimits<float>::Max();
@@ -651,15 +622,15 @@ bool AARHUD::ComputeDepthMeanInBoundsUV(
             ++CandidateCount;
 
             const FLinearColor& Pixel = PixelData[Y * Width + X];
-            const float PixelDepth = Pixel.R;
+            const float PixelDepth = Pixel.R; 
 
-            if (!FMath::IsFinite(PixelDepth) || PixelDepth < MinValidDepthMeters || PixelDepth > SafeMaxValidDepthMeters)
+            if (!FMath::IsFinite(PixelDepth))
             {
                 continue;
             }
 
-            DepthSum += static_cast<double>(PixelDepth);
-            DepthSquaredSum += static_cast<double>(PixelDepth) * static_cast<double>(PixelDepth);
+            DepthSum += static_cast<float>(PixelDepth);
+            DepthSquaredSum += static_cast<float>(PixelDepth) * static_cast<float>(PixelDepth);
             MinDepth = FMath::Min(MinDepth, PixelDepth);
             MaxDepth = FMath::Max(MaxDepth, PixelDepth);
             ++Count;
@@ -672,17 +643,17 @@ bool AARHUD::ComputeDepthMeanInBoundsUV(
     }
 
     OutSampleCount = Count;
-    OutMeanDepthValue = static_cast<float>(DepthSum / static_cast<double>(Count));
+    OutMeanDepthValue = static_cast<float>(DepthSum / static_cast<float>(Count));
 
-    float DepthSampleConfidence = 1.0f;
+    float DepthSampleConfidence = 1.0;
     if (CandidateCount > 0)
     {
         const float ValidRatio = static_cast<float>(Count) / static_cast<float>(CandidateCount);
-        const double Mean = DepthSum / static_cast<double>(Count);
-        const double MeanSquared = Mean * Mean;
-        const double Variance = FMath::Max(0.0, (DepthSquaredSum / static_cast<double>(Count)) - MeanSquared);
+        const float Mean = DepthSum / static_cast<float>(Count);
+        const float MeanSquared = Mean * Mean;
+        const float Variance = FMath::Max(0.0, (DepthSquaredSum / static_cast<float>(Count)) - MeanSquared);
         const float StdDev = static_cast<float>(FMath::Sqrt(Variance));
-        const float Stability = 1.0f - FMath::Clamp(StdDev / SafeMaxStdDev, 0.0f, 1.0f);
+        const float Stability = 1.0 - FMath::Clamp(StdDev / SafeMaxStdDev, 0.0, 1.0);
         DepthSampleConfidence = ValidRatio * Stability;
     }
 
@@ -868,11 +839,12 @@ void AARHUD::DrawChestSamplingArea()
 
 void AARHUD::RecordThoraxDepthSample(const float DepthUnits)
 {
-    const float AdjustedUnits = DepthUnits + DepthSubUnitRemainder;
-    const int32 RoundedUnits = FMath::RoundToInt(AdjustedUnits);
-    DepthSubUnitRemainder = FMath::Clamp(AdjustedUnits - static_cast<float>(RoundedUnits), -2.0f, 2.0f);
+    if (!FMath::IsFinite(DepthUnits))
+    {
+        return;
+    }
 
-    ThoraxDepthHistoryMillimeters.Add(RoundedUnits);
+    ThoraxDepthHistoryMillimeters.Add(DepthUnits);
 
     const int32 MaxSamples = FMath::Max(1, ThoraxDepthHistoryMaxSamples);
     if (ThoraxDepthHistoryMillimeters.Num() > MaxSamples)
@@ -884,33 +856,15 @@ void AARHUD::RecordThoraxDepthSample(const float DepthUnits)
 
 void AARHUD::PushThoraxDepthToMainPanel()
 {
-    if (!MainPanelWidget || MainPanelDepthUpdateFunctionName.IsNone())
+    if (!bEnableThoraxDepthGraphUpdates || !MainPanelWidget)
     {
         return;
     }
-
-    UFunction* UpdateFunction = MainPanelWidget->FindFunction(MainPanelDepthUpdateFunctionName);
-    if (!UpdateFunction)
-    {
-        if (!bLoggedMissingDepthGraphFunction)
-        {
-            UE_LOG(
-                LogTemp,
-                Warning,
-                TEXT("AARHUD: Debug panel function '%s' not found. Add it in WBP_MainPanel to receive depth graph updates."),
-                *MainPanelDepthUpdateFunctionName.ToString()
-            );
-            bLoggedMissingDepthGraphFunction = true;
-        }
-        return;
-    }
-
-    bLoggedMissingDepthGraphFunction = false;
 
     struct FUpdateThoraxDepthGraphParams
     {
-        TArray<int32> DepthHistoryMillimeters;
-        int32 CurrentDepthMillimeters = 0;
+        TArray<float> DepthHistoryMillimeters;
+        float CurrentDepthMillimeters = 0.0f;
         bool bHasDepth = false;
     };
 
@@ -919,7 +873,8 @@ void AARHUD::PushThoraxDepthToMainPanel()
     Params.CurrentDepthMillimeters = LastThoraxDepthMillimeters;
     Params.bHasDepth = bHasThoraxDepthReading;
 
-    MainPanelWidget->ProcessEvent(UpdateFunction, &Params);
+    UUDepthGraphWidget* GraphWidget = FindDepthGraphWidget(MainPanelWidget);
+    GraphWidget->SetGraphData(Params.DepthHistoryMillimeters, Params.CurrentDepthMillimeters, Params.bHasDepth);
 }
 
 FVector2D AARHUD::ToScreenSpace(float X, float Y) const
