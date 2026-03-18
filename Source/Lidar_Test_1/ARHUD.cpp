@@ -213,10 +213,10 @@ void AARHUD::ValidateEditorAssignments() const
     }
 }
 
-void AARHUD::GetThoraxDepthHistory(TArray<float>& OutHistoryMillimeters, float& OutLatestDepthMillimeters, bool& bOutHasDepth) const
+void AARHUD::GetThoraxDepthHistory(TArray<float>& OutHistory, float& OutLatestDepth, bool& bOutHasDepth) const
 {
-    OutHistoryMillimeters = ThoraxDepthHistoryMillimeters;
-    OutLatestDepthMillimeters = LastThoraxDepthMillimeters;
+    OutHistory = ThoraxDepthHistory;
+    OutLatestDepth = LastThoraxDepth;
     bOutHasDepth = bHasThoraxDepthReading;
 }
 
@@ -309,14 +309,14 @@ void AARHUD::Tick(float DeltaSeconds)
     const float MinDepthRaw = MinDepthValue * 10000.0f;
     const float MaxDepthRaw = MaxDepthValue * 10000.0f;
 
-    LastThoraxDepthMillimeters = MeanDepthRaw;
+    LastThoraxDepth = MeanDepthRaw;
     bHasThoraxDepthReading = true;
     RecordThoraxDepthSample(MeanDepthRaw);
     PushThoraxDepthToMainPanel();
 
     if (true)
     {
-        if (bLogThoraxDepthInMillimeters)
+        if (bLogThoraxDepthIn)
         {
             UE_LOG(
                 LogTemp,
@@ -844,13 +844,13 @@ void AARHUD::RecordThoraxDepthSample(const float DepthUnits)
         return;
     }
 
-    ThoraxDepthHistoryMillimeters.Add(DepthUnits);
+    ThoraxDepthHistory.Add(DepthUnits);
 
     const int32 MaxSamples = FMath::Max(1, ThoraxDepthHistoryMaxSamples);
-    if (ThoraxDepthHistoryMillimeters.Num() > MaxSamples)
+    if (ThoraxDepthHistory.Num() > MaxSamples)
     {
-        const int32 SamplesToTrim = ThoraxDepthHistoryMillimeters.Num() - MaxSamples;
-        ThoraxDepthHistoryMillimeters.RemoveAt(0, SamplesToTrim, EAllowShrinking::No);
+        const int32 SamplesToTrim = ThoraxDepthHistory.Num() - MaxSamples;
+        ThoraxDepthHistory.RemoveAt(0, SamplesToTrim, EAllowShrinking::No);
     }
 }
 
@@ -863,18 +863,18 @@ void AARHUD::PushThoraxDepthToMainPanel()
 
     struct FUpdateThoraxDepthGraphParams
     {
-        TArray<float> DepthHistoryMillimeters;
-        float CurrentDepthMillimeters = 0.0f;
+        TArray<float> DepthHistory;
+        float CurrentDepth = 0.0f;
         bool bHasDepth = false;
     };
 
     FUpdateThoraxDepthGraphParams Params;
-    Params.DepthHistoryMillimeters = ThoraxDepthHistoryMillimeters;
-    Params.CurrentDepthMillimeters = LastThoraxDepthMillimeters;
+    Params.DepthHistory = ThoraxDepthHistory;
+    Params.CurrentDepth = LastThoraxDepth;
     Params.bHasDepth = bHasThoraxDepthReading;
 
     UUDepthGraphWidget* GraphWidget = FindDepthGraphWidget(MainPanelWidget);
-    GraphWidget->SetGraphData(Params.DepthHistoryMillimeters, Params.CurrentDepthMillimeters, Params.bHasDepth);
+    GraphWidget->SetGraphData(Params.DepthHistory, Params.CurrentDepth, Params.bHasDepth);
 }
 
 FVector2D AARHUD::ToScreenSpace(float X, float Y) const

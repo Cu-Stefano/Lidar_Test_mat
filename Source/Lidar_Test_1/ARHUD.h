@@ -27,7 +27,7 @@ public:
     AARHUD();
 
     UFUNCTION(BlueprintCallable, Category="UI|DepthGraph")
-    void GetThoraxDepthHistory(TArray<float>& OutHistoryMillimeters, float& OutLatestDepthMillimeters, bool& bOutHasDepth) const;
+    void GetThoraxDepthHistory(TArray<float>& OutHistory, float& OutLatestDepth, bool& bOutHasDepth) const;
 
 protected:
     virtual void BeginPlay() override;
@@ -169,7 +169,7 @@ protected:
     bool bDepthMaterialValuesAreNormalized = false;
 
     UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
-    bool bLogThoraxDepthInMillimeters = true;
+    bool bLogThoraxDepthIn = true;
 
     UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
     bool bUseFloat32DepthSampling = false;
@@ -206,7 +206,7 @@ protected:
     TObjectPtr<UTextureRenderTarget2D> DepthDebugRenderTarget = nullptr;
 
     UPROPERTY(Transient)
-    float LastThoraxDepthMillimeters = 0.0f;
+    float LastThoraxDepth = 0.0f;
 
     UPROPERTY(Transient)
     bool bHasThoraxDepthReading = false;
@@ -221,7 +221,7 @@ protected:
     bool bEnableThoraxDepthGraphUpdates = true;
 
     UPROPERTY(Transient)
-    TArray<float> ThoraxDepthHistoryMillimeters;
+    TArray<float> ThoraxDepthHistory;
 
     UPROPERTY(Transient)
     bool bLoggedMissingDepthGraphFunction = false;
