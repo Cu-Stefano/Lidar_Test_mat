@@ -45,32 +45,17 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style")
 	FLinearColor CurrentPointColor = FLinearColor(0.95f, 0.95f, 0.95f, 1.00f);
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style")
-	FLinearColor RecentRedExtremsColor = FLinearColor(1.00f, 0.20f, 0.20f, 1.00f);
-
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style", meta=(ClampMin="0.5", ClampMax="6.0"))
 	float LineThickness = 2.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style", meta=(ClampMin="1.0", ClampMax="20.0"))
 	float CurrentPointSize = 5.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style", meta=(ClampMin="2.0", ClampMax="24.0"))
-	float RecentRedExtremsMarkerSize = 8.0f;
-
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style", meta=(ClampMin="16", ClampMax="2000"))
 	int32 MaxHistorySamples = 500;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis", meta=(ClampMin="0", ClampMax="5000", UIMin="0", UIMax="200"))
 	int32 FixedYRangePaddingMillimeters = 30;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|RedExtrems", meta=(ClampMin="2", ClampMax="20000", UIMin="50", UIMax="5000"))
-	int32 RecentRedExtremsSampleWindow = 300;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|RedExtrems", meta=(ClampMin="1", ClampMax="5000", UIMin="1", UIMax="120"))
-	int32 RecentRedExtremsAddEverySamples = 15;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|RedExtrems", meta=(ClampMin="2", ClampMax="5000", UIMin="20", UIMax="800"))
-	int32 MaxPersistentRedExtremsMarkers = 400;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|Smoothing")
 	bool bEnableDepthSmoothing = true;
@@ -86,11 +71,4 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, Category="Depth Graph|Data")
 	bool bHasDepth = false;
-
-private:
-	TArray<int32> RecentDepthMillimeters;
-
-	mutable TArray<FIntPoint> PersistentRedExtremsMarkers;
-	mutable int32 LastPersistentMarkerTotalSamples = 0;
-	mutable int32 SamplesSinceLastPersistentMarker = 0;
 };
