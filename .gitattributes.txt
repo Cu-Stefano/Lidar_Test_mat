@@ -1,0 +1,26 @@
+# Unreal Engine binary assets
+*.uasset filter=lfs diff=lfs merge=lfs -text
+*.umap  filter=lfs diff=lfs merge=lfs -text
+
+# Large audio/video files
+*.wav   filter=lfs diff=lfs merge=lfs -text
+*.mp3   filter=lfs diff=lfs merge=lfs -text
+*.ogg   filter=lfs diff=lfs merge=lfs -text
+*.mp4   filter=lfs diff=lfs merge=lfs -text
+*.avi   filter=lfs diff=lfs merge=lfs -text
+*.mov   filter=lfs diff=lfs merge=lfs -text
+
+# Large textures or images
+*.png   filter=lfs diff=lfs merge=lfs -text
+*.tga   filter=lfs diff=lfs merge=lfs -text
+*.jpg   filter=lfs diff=lfs merge=lfs -text
+*.jpeg  filter=lfs diff=lfs merge=lfs -text
+*.exr   filter=lfs diff=lfs merge=lfs -text
+
+# 3D models or other binary assets
+*.fbx   filter=lfs diff=lfs merge=lfs -text
+*.obj   filter=lfs diff=lfs merge=lfs -text
+
+# Plugin folders (binaries/intermediate)
+**/Plugins/**/Binaries/* filter=lfs diff=lfs merge=lfs -text
+**/Plugins/**/Intermediate/* filter=lfs diff=lfs merge=lfs -text

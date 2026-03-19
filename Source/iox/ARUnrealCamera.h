@@ -9,7 +9,7 @@
 
 
 UCLASS()
-class LIDAR_TEST_1_API UARUnrealCamera : public UObject, public ICameraWithDepth
+class IOX_API UARUnrealCamera : public UObject, public ICameraWithDepth
 {
 	GENERATED_BODY()
 

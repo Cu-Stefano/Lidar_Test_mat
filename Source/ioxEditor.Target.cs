@@ -3,13 +3,13 @@
 using UnrealBuildTool;
 using System.Collections.Generic;
 
-public class Lidar_Test_1EditorTarget : TargetRules
+public class ioxEditorTarget : TargetRules
 {
-	public Lidar_Test_1EditorTarget(TargetInfo Target) : base(Target)
+	public ioxEditorTarget(TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Editor;
 		DefaultBuildSettings = BuildSettingsVersion.V5;
 
-		ExtraModuleNames.AddRange( new string[] { "Lidar_Test_1" } );
+		ExtraModuleNames.AddRange( new string[] { "iox" } );
 	}
 }

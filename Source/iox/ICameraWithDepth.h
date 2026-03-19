@@ -18,7 +18,7 @@ class UCameraWithDepth : public UInterface
 /**
  * 
  */
-class LIDAR_TEST_1_API ICameraWithDepth
+class IOX_API ICameraWithDepth
 {
 	GENERATED_BODY()
 

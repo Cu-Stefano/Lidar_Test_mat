@@ -20,7 +20,7 @@ class UIPoseDetector : public UInterface
  * Interface per qualsiasi componente di pose detection.
  * Attualmente implementata da UDefaultPoseDetector (via BodyPoseManager).
  */
-class LIDAR_TEST_1_API IIPoseDetector
+class IOX_API IIPoseDetector
 {
     GENERATED_BODY()
 

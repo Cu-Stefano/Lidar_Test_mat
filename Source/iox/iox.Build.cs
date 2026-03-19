@@ -2,9 +2,9 @@
 
 using UnrealBuildTool;
 
-public class Lidar_Test_1 : ModuleRules
+public class iox : ModuleRules
 {
-	public Lidar_Test_1(ReadOnlyTargetRules Target) : base(Target)
+	public iox(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	

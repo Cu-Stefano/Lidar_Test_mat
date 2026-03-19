@@ -7,7 +7,7 @@
 #include "DummyActor.generated.h"
 
 UCLASS()
-class LIDAR_TEST_1_API ADummyActor : public AActor
+class IOX_API ADummyActor : public AActor
 {
 	GENERATED_BODY()
 	

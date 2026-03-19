@@ -19,7 +19,7 @@ class UFont;
  * 
  */
 UCLASS()
-class LIDAR_TEST_1_API AARHUD : public AHUD
+class IOX_API AARHUD : public AHUD
 {
 	GENERATED_BODY()
 

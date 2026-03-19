@@ -11,7 +11,7 @@
  * 
  */
 UCLASS()
-class LIDAR_TEST_1_API UUDepthGraphWidget : public UUserWidget
+class IOX_API UUDepthGraphWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
@@ -55,7 +55,7 @@ protected:
 	int32 MaxHistorySamples = 500;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis", meta=(ClampMin="0", ClampMax="5000", UIMin="0", UIMax="20000"))
-	float FixedYRangePadding = 1000.0f;
+	float FixedYRangePadding = 15.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|Smoothing")
 	bool bEnableDepthSmoothing = true;

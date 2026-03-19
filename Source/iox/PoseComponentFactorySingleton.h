@@ -6,7 +6,7 @@
 #include "UObject/ScriptInterface.h"
 #include "IPoseDetector.h"
 
-class LIDAR_TEST_1_API PoseComponentFactorySingleton
+class IOX_API PoseComponentFactorySingleton
 {
 
 public:

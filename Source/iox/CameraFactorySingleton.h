@@ -5,7 +5,7 @@
 #include "UObject/ScriptInterface.h"
 #include "ICameraWithDepth.h"
 
-class LIDAR_TEST_1_API CameraFactorySingleton
+class IOX_API CameraFactorySingleton
 {
 
 public:

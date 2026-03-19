@@ -11,7 +11,7 @@
 
 
 UCLASS()
-class LIDAR_TEST_1_API UDefaultPoseDetector : public UObject, public IIPoseDetector
+class IOX_API UDefaultPoseDetector : public UObject, public IIPoseDetector
 {
 	GENERATED_BODY()
 
