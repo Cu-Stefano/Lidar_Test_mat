@@ -96,18 +96,6 @@ protected:
     FName DepthTextureParameterName = TEXT("DepthParam");
 
     UPROPERTY(EditAnywhere, Category="UI")
-    FName DepthNearMetersParameterName = TEXT("DepthNearMeters");
-
-    UPROPERTY(EditAnywhere, Category="UI")
-    FName DepthFarMetersParameterName = TEXT("DepthFarMeters");
-
-    UPROPERTY(EditAnywhere, Category="UI", meta=(ClampMin="0.01", ClampMax="3.0"))
-    float DepthNearMeters = 0.10f;
-
-    UPROPERTY(EditAnywhere, Category="UI", meta=(ClampMin="0.5", ClampMax="20.0"))
-    float DepthFarMeters = 9.0f;
-
-    UPROPERTY(EditAnywhere, Category="UI")
     FName CameraTextureParameterName = TEXT("CameraTexture");
 
     // ================= Chest Sampling Overlay =================
@@ -164,10 +152,6 @@ protected:
     UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
     bool bLogThoraxDepthMinMax = true;
 
-    // True when MT_DepthMaterial outputs normalized depth in [0..1] using DepthNearMeters/DepthFarMeters.
-    UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
-    bool bDepthMaterialValuesAreNormalized = false;
-
     UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
     bool bLogThoraxDepthIn = true;
 
@@ -181,17 +165,6 @@ protected:
     // Confidence in [0..1], computed from valid-pixel ratio and local depth stability.
     UPROPERTY(EditAnywhere, Category="Pose|DepthDebug", meta=(ClampMin="0.0", ClampMax="1.0"))
     float MinDepthSampleConfidence = 0.45f;
-
-    // Depth values outside this range are ignored as invalid during confidence estimation.
-    UPROPERTY(EditAnywhere, Category="Pose|DepthDebug", meta=(ClampMin="0.01", ClampMax="20.0"))
-    float MinValidDepthMeters = 0.05f;
-
-    UPROPERTY(EditAnywhere, Category="Pose|DepthDebug", meta=(ClampMin="0.1", ClampMax="30.0"))
-    float MaxValidDepthMeters = 1000000000.0f;
-
-    // Local standard deviation at this value or above is treated as low confidence.
-    UPROPERTY(EditAnywhere, Category="Pose|DepthDebug", meta=(ClampMin="0.001", ClampMax="2.0"))
-    float MaxDepthStdDevForConfidenceMeters = 0.18f;
 
     UPROPERTY(Transient)
     FVector2D ActiveThoraxMinUV = FVector2D::ZeroVector;

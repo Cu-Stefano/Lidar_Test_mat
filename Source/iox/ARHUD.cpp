@@ -231,8 +231,6 @@ void AARHUD::Tick(float DeltaSeconds)
             if (UTexture* DepthTexture = CameraWithDepth->GetDepthTexture())
             {
                 DepthMaterial->SetTextureParameterValue(DepthTextureParameterName, DepthTexture);
-                DepthMaterial->SetScalarParameterValue(DepthNearMetersParameterName, DepthNearMeters);
-                DepthMaterial->SetScalarParameterValue(DepthFarMetersParameterName, FMath::Max(DepthNearMeters + KINDA_SMALL_NUMBER, DepthFarMeters));
                 if (bShowDepthOverlay)
                 {
                     UpdateDepthWidgetState();
@@ -606,10 +604,7 @@ bool AARHUD::ComputeDepthMeanInBoundsUV(
     const int32 StartY = FMath::Clamp(FMath::RoundToInt(FMath::Min(MinUV.Y, MaxUV.Y) * static_cast<float>(Height - 1)), 0, Height - 1);
     const int32 EndY = FMath::Clamp(FMath::RoundToInt(FMath::Max(MinUV.Y, MaxUV.Y) * static_cast<float>(Height - 1)), 0, Height - 1);
 
-    const float SafeMaxStdDev = FMath::Max(0.001, MaxDepthStdDevForConfidenceMeters);
- 
     float DepthSum = 0.0;
-    float DepthSquaredSum = 0.0;
     int32 CandidateCount = 0;
     int32 Count = 0;
     float MinDepth = TNumericLimits<float>::Max();
@@ -630,7 +625,6 @@ bool AARHUD::ComputeDepthMeanInBoundsUV(
             }
 
             DepthSum += static_cast<float>(PixelDepth);
-            DepthSquaredSum += static_cast<float>(PixelDepth) * static_cast<float>(PixelDepth);
             MinDepth = FMath::Min(MinDepth, PixelDepth);
             MaxDepth = FMath::Max(MaxDepth, PixelDepth);
             ++Count;
@@ -649,12 +643,7 @@ bool AARHUD::ComputeDepthMeanInBoundsUV(
     if (CandidateCount > 0)
     {
         const float ValidRatio = static_cast<float>(Count) / static_cast<float>(CandidateCount);
-        const float Mean = DepthSum / static_cast<float>(Count);
-        const float MeanSquared = Mean * Mean;
-        const float Variance = FMath::Max(0.0, (DepthSquaredSum / static_cast<float>(Count)) - MeanSquared);
-        const float StdDev = static_cast<float>(FMath::Sqrt(Variance));
-        const float Stability = 1.0 - FMath::Clamp(StdDev / SafeMaxStdDev, 0.0, 1.0);
-        DepthSampleConfidence = ValidRatio * Stability;
+        DepthSampleConfidence = ValidRatio;
     }
 
     if (OutDepthSampleConfidence)
