@@ -30,28 +30,28 @@ protected:
 		bool bParentEnabled
 	) const override;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|Style")
 	FMargin GraphPadding = FMargin(12.0f, 12.0f, 12.0f, 12.0f);
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|Style")
 	FLinearColor BackgroundColor = FLinearColor(0.03f, 0.03f, 0.03f, 0.70f);
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|Style")
 	FLinearColor BorderColor = FLinearColor(0.20f, 0.20f, 0.20f, 1.00f);
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|Style")
 	FLinearColor LineColor = FLinearColor(0.10f, 0.80f, 0.30f, 1.00f);
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|Style")
 	FLinearColor CurrentPointColor = FLinearColor(0.95f, 0.95f, 0.95f, 1.00f);
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style", meta=(ClampMin="0.5", ClampMax="6.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|Style", meta=(ClampMin="0.5", ClampMax="6.0"))
 	float LineThickness = 2.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style", meta=(ClampMin="1.0", ClampMax="20.0"))
+	UPROPERTY(EditAnywhere, Category="Depth Graph|Style", meta=(ClampMin="1.0", ClampMax="20.0"))
 	float CurrentPointSize = 5.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Depth Graph|Style", meta=(ClampMin="16", ClampMax="2000"))
+	UPROPERTY(EditAnywhere, Category="Depth Graph|Style", meta=(ClampMin="16", ClampMax="2000"))
 	int32 MaxHistorySamples = 500;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis", meta=(ClampMin="0", ClampMax="5000", UIMin="0", UIMax="20000"))

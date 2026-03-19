@@ -10,6 +10,7 @@
 #include "ARHUD.generated.h"
 
 class UUserWidget;
+class UMainPanel;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class UTextureRenderTarget2D;
@@ -29,6 +30,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="UI|DepthGraph")
     void GetThoraxDepthHistory(TArray<float>& OutHistory, float& OutLatestDepth, bool& bOutHasDepth) const;
 
+    UFUNCTION(BlueprintCallable, Category="UI|DepthGraph")
+    void GetSternumDepthHistory(TArray<float>& OutHistory, float& OutLatestDepth, bool& bOutHasDepth) const;
+
 protected:
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaSeconds) override;
@@ -43,10 +47,10 @@ protected:
     TObjectPtr<UUserWidget> SceneDepthWidget = nullptr;
 
     UPROPERTY(EditDefaultsOnly, Category="UI")
-    TSubclassOf<UUserWidget> MainPanelClass;
+    TSubclassOf<UMainPanel> MainPanelClass;
 
     UPROPERTY(Transient)
-    TObjectPtr<UUserWidget> MainPanelWidget = nullptr;
+    TObjectPtr<UMainPanel> MainPanelWidget = nullptr;
 
     UPROPERTY(EditAnywhere, Category="UI|MainPanel")
     bool bShowMainPanel = true;
@@ -199,6 +203,44 @@ protected:
     UPROPERTY(Transient)
     bool bLoggedMissingDepthGraphFunction = false;
 
+    // ================= Sternum Sampling Overlay =================
+    UPROPERTY(EditAnywhere, Category="Overlay|Sternum")
+    TObjectPtr<UMaterialInterface> SternumAreaMaterial = nullptr;
+
+    UPROPERTY(EditAnywhere, Category="Overlay|Sternum")
+    bool bShowSternumSamplingArea = true;
+
+    UPROPERTY(EditAnywhere, Category="Overlay|Sternum")
+    FLinearColor SternumAreaFallbackColor = FLinearColor(1.0f, 0.1f, 0.1f, 0.25f);
+
+    UPROPERTY(EditAnywhere, Category="Overlay|Sternum")
+    FLinearColor SternumAreaOutlineColor = FLinearColor(1.0f, 0.1f, 0.1f, 0.9f);
+
+    UPROPERTY(EditAnywhere, Category="Overlay|Sternum", meta=(ClampMin="0.5", ClampMax="8.0"))
+    float SternumAreaOutlineThickness = 2.0f;
+
+    // Sternum
+    UPROPERTY(EditAnywhere, Category="UI|Sternum", meta=(ClampMin="0", ClampMax="1"))
+    float SternumAreaSize = 0.5f;
+
+    UPROPERTY(Transient)
+    FVector2D ActiveSternumMinUV = FVector2D::ZeroVector;
+
+    UPROPERTY(Transient)
+    FVector2D ActiveSternumMaxUV = FVector2D::ZeroVector;
+
+    UPROPERTY(Transient)
+    bool bHasActiveSternumBounds = false;
+
+    UPROPERTY(Transient)
+    float LastSternumDepth = 0.0f;
+
+    UPROPERTY(Transient)
+    bool bHasSternumDepthReading = false;
+
+    UPROPERTY(Transient)
+    TArray<float> SternumDepthHistory;
+
 private:
     void ValidateEditorAssignments() const;
     void PushMaterialToWidget(UMaterialInterface* Material);
@@ -206,11 +248,14 @@ private:
     void UpdateMainPanelState();
     void DrawDepthToggleButton();
     void DrawChestSamplingArea();
+    void DrawSternumArea();
     FVector2D ToScreenSpace(float X, float Y) const;
     void DrawJointsOverlay();
     void RecordThoraxDepthSample(float DepthUnits);
+    void RecordSternumDepthSample(float DepthUnits);
     void PushThoraxDepthToMainPanel();
     bool TryGetThoraxBoundsUV(const TArray<FPoseJoint>& Joints, FVector2D& OutMinUV, FVector2D& OutMaxUV) const;
+    bool TryGetSternumBoundsUV(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV, FVector2D& OutMinUV, FVector2D& OutMaxUV, float SternumAreaSize) const;
     bool ComputeDepthMeanInBoundsUV(
         const FVector2D& MinUV,
         const FVector2D& MaxUV,

@@ -17,6 +17,7 @@
 #include "PoseComponentFactorySingleton.h"
 #include "ICameraWithDepth.h"
 #include "UDepthGraphWidget.h"
+#include "MainPanel.h"
 
 namespace
 {
@@ -123,7 +124,7 @@ void AARHUD::BeginPlay()
         SceneDepthWidget = CreateWidget<UUserWidget>(PC, DepthWidgetClass);
         if (SceneDepthWidget)
         {
-            SceneDepthWidget->AddToViewport();
+            SceneDepthWidget->AddToViewport(-1);
         }
     }
 
@@ -143,10 +144,10 @@ void AARHUD::BeginPlay()
 
     if (MainPanelClass && PC)
     {
-        MainPanelWidget = CreateWidget<UUserWidget>(PC, MainPanelClass);
+        MainPanelWidget = CreateWidget<UMainPanel>(PC, MainPanelClass);
         if (MainPanelWidget)
         {
-            MainPanelWidget->AddToViewport(10);
+            MainPanelWidget->AddToViewport(5);
         }
     }
 
@@ -220,6 +221,13 @@ void AARHUD::GetThoraxDepthHistory(TArray<float>& OutHistory, float& OutLatestDe
     bOutHasDepth = bHasThoraxDepthReading;
 }
 
+void AARHUD::GetSternumDepthHistory(TArray<float>& OutHistory, float& OutLatestDepth, bool& bOutHasDepth) const
+{
+    OutHistory = SternumDepthHistory;
+    OutLatestDepth = LastSternumDepth;
+    bOutHasDepth = bHasSternumDepthReading;
+}
+
 void AARHUD::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
@@ -263,6 +271,7 @@ void AARHUD::Tick(float DeltaSeconds)
     {
         bHasThoraxDepthReading = false;
         bHasActiveThoraxBounds = false;
+        bHasActiveSternumBounds = false;
         UE_LOG(LogTemp, Warning, TEXT("Thorax depth mean skipped: PoseDetectorProvider not valid"));
         return;
     }
@@ -274,12 +283,16 @@ void AARHUD::Tick(float DeltaSeconds)
     {
         bHasThoraxDepthReading = false;
         bHasActiveThoraxBounds = false;
+        bHasActiveSternumBounds = false;
         UE_LOG(LogTemp, Warning, TEXT("Thorax depth mean skipped: full thorax bounds not available (need both shoulders and hips)"));
         return;
     }
 
     ActiveThoraxMinUV = ThoraxMinUV;
     ActiveThoraxMaxUV = ThoraxMaxUV;
+
+    bHasActiveSternumBounds = TryGetSternumBoundsUV(ActiveThoraxMinUV, ActiveThoraxMaxUV, ActiveSternumMinUV, ActiveSternumMaxUV, SternumAreaSize);
+
     bHasActiveThoraxBounds = true;
 
     const FVector2D ThoraxCenterUV = 0.5f * (ThoraxMinUV + ThoraxMaxUV);
@@ -310,6 +323,21 @@ void AARHUD::Tick(float DeltaSeconds)
     LastThoraxDepth = MeanDepthRaw;
     bHasThoraxDepthReading = true;
     RecordThoraxDepthSample(MeanDepthRaw);
+
+    float SternumMeanDepthValue = 0.0f;
+    int32 SternumSampleCount = 0;
+    
+    if (bHasActiveSternumBounds && ComputeDepthMeanInBoundsUV(ActiveSternumMinUV, ActiveSternumMaxUV, SternumMeanDepthValue, SternumSampleCount, nullptr, nullptr, nullptr))
+    {
+        LastSternumDepth = SternumMeanDepthValue * 10000.0f;
+        bHasSternumDepthReading = true;
+        RecordSternumDepthSample(LastSternumDepth);
+    }
+    else
+    {
+        bHasSternumDepthReading = false;
+    }
+
     PushThoraxDepthToMainPanel();
 
     if (true)
@@ -347,6 +375,7 @@ void AARHUD::DrawHUD()
 
     DrawDepthToggleButton();
     DrawChestSamplingArea();
+    DrawSternumArea();
 
     if (!Canvas || !PoseDetectorProvider.GetObject())
     {
@@ -529,6 +558,29 @@ bool AARHUD::TryGetThoraxBoundsUV(const TArray<FPoseJoint>& Joints, FVector2D& O
     OutMaxUV = FVector2D(MaxX, MaxY);
     return true;
 }
+
+bool AARHUD::TryGetSternumBoundsUV(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV, FVector2D& OutMinUV, FVector2D& OutMaxUV, float AreaSize) const
+{
+    // Calcoliamo la larghezza e l'altezza del torace in coordinate UV
+    const float ThoraxWidth = ThoraxMaxUV.X - ThoraxMinUV.X;
+    const float ThoraxHeight = ThoraxMaxUV.Y - ThoraxMinUV.Y;
+
+    // Troviamo il centro dello sterno (metà delle U e 1/3 delle V dall'alto)
+    const float SternumU = ThoraxMinUV.X + (ThoraxWidth * 0.5f);
+    const float SternumV = ThoraxMinUV.Y + (ThoraxHeight * 0.5f);
+
+    // Creiamo un'area quadrata attorno allo sterno proporzionale a SternumAreaSize
+    const float BoxSize = ThoraxWidth * AreaSize;
+    const float HalfBoxSize = BoxSize * 0.5f;
+
+    OutMinUV.X = FMath::Clamp(SternumU - HalfBoxSize, 0.0f, 1.0f);
+    OutMinUV.Y = FMath::Clamp(SternumV - HalfBoxSize, 0.0f, 1.0f);
+    OutMaxUV.X = FMath::Clamp(SternumU + HalfBoxSize, 0.0f, 1.0f);
+    OutMaxUV.Y = FMath::Clamp(SternumV + HalfBoxSize, 0.0f, 1.0f);
+
+    return true;
+}
+
 
 bool AARHUD::ComputeDepthMeanInBoundsUV(
     const FVector2D& MinUV,
@@ -826,6 +878,72 @@ void AARHUD::DrawChestSamplingArea()
     }
 }
 
+void AARHUD::DrawSternumArea()
+{
+    if (!Canvas || !bShowSternumSamplingArea)
+    {
+        return;
+    }
+
+    if (!bHasActiveSternumBounds)
+    {
+        return;
+    }
+
+    const float Width = Canvas->ClipX;
+    const float Height = Canvas->ClipY;
+    if (Width <= 1.0f || Height <= 1.0f)
+    {
+        return;
+    }
+
+    const float MinX = FMath::Min(ActiveSternumMinUV.X, ActiveSternumMaxUV.X);
+    const float MaxX = FMath::Max(ActiveSternumMinUV.X, ActiveSternumMaxUV.X);
+    const float MinY = FMath::Min(ActiveSternumMinUV.Y, ActiveSternumMaxUV.Y);
+    const float MaxY = FMath::Max(ActiveSternumMinUV.Y, ActiveSternumMaxUV.Y);
+
+    float RectX = MinX * Width;
+    float RectY = MinY * Height;
+    float RectW = (MaxX - MinX) * Width;
+    float RectH = (MaxY - MinY) * Height;
+
+    RectX = FMath::Clamp(RectX, 0.0f, Width - 1.0f);
+    RectY = FMath::Clamp(RectY, 0.0f, Height - 1.0f);
+    RectW = FMath::Clamp(RectW, 1.0f, Width - RectX);
+    RectH = FMath::Clamp(RectH, 1.0f, Height - RectY);
+
+    if (SternumAreaMaterial)
+    {
+        DrawMaterial(
+            SternumAreaMaterial,
+            RectX,
+            RectY,
+            RectW,
+            RectH,
+            0.0f,
+            0.0f,
+            1.0f,
+            1.0f,
+            1.0f,
+            false,
+            0.0f,
+            FVector2D::ZeroVector
+        );
+    }
+    else
+    {
+        DrawRect(SternumAreaFallbackColor, RectX, RectY, RectW, RectH);
+    }
+
+    if (SternumAreaOutlineThickness > 0.0f)
+    {
+        DrawLine(RectX, RectY, RectX + RectW, RectY, SternumAreaOutlineColor, SternumAreaOutlineThickness);
+        DrawLine(RectX, RectY + RectH, RectX + RectW, RectY + RectH, SternumAreaOutlineColor, SternumAreaOutlineThickness);
+        DrawLine(RectX, RectY, RectX, RectY + RectH, SternumAreaOutlineColor, SternumAreaOutlineThickness);
+        DrawLine(RectX + RectW, RectY, RectX + RectW, RectY + RectH, SternumAreaOutlineColor, SternumAreaOutlineThickness);
+    }
+}
+
 void AARHUD::RecordThoraxDepthSample(const float DepthUnits)
 {
     if (!FMath::IsFinite(DepthUnits))
@@ -843,6 +961,23 @@ void AARHUD::RecordThoraxDepthSample(const float DepthUnits)
     }
 }
 
+void AARHUD::RecordSternumDepthSample(const float DepthUnits)
+{
+    if (!FMath::IsFinite(DepthUnits))
+    {
+        return;
+    }
+
+    SternumDepthHistory.Add(DepthUnits);
+
+    const int32 MaxSamples = FMath::Max(1, ThoraxDepthHistoryMaxSamples);
+    if (SternumDepthHistory.Num() > MaxSamples)
+    {
+        const int32 SamplesToTrim = SternumDepthHistory.Num() - MaxSamples;
+        SternumDepthHistory.RemoveAt(0, SamplesToTrim, EAllowShrinking::No);
+    }
+}
+
 void AARHUD::PushThoraxDepthToMainPanel()
 {
     if (!bEnableThoraxDepthGraphUpdates || !MainPanelWidget)
@@ -850,20 +985,8 @@ void AARHUD::PushThoraxDepthToMainPanel()
         return;
     }
 
-    struct FUpdateThoraxDepthGraphParams
-    {
-        TArray<float> DepthHistory;
-        float CurrentDepth = 0.0f;
-        bool bHasDepth = false;
-    };
-
-    FUpdateThoraxDepthGraphParams Params;
-    Params.DepthHistory = ThoraxDepthHistory;
-    Params.CurrentDepth = LastThoraxDepth;
-    Params.bHasDepth = bHasThoraxDepthReading;
-
-    UUDepthGraphWidget* GraphWidget = FindDepthGraphWidget(MainPanelWidget);
-    GraphWidget->SetGraphData(Params.DepthHistory, Params.CurrentDepth, Params.bHasDepth);
+    MainPanelWidget->UpdateThoraxDepthGraph(ThoraxDepthHistory, LastThoraxDepth, bHasThoraxDepthReading);
+    MainPanelWidget->UpdateSternumDepthGraph(SternumDepthHistory, LastSternumDepth, bHasSternumDepthReading);
 }
 
 FVector2D AARHUD::ToScreenSpace(float X, float Y) const
