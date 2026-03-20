@@ -9,5 +9,5 @@
 // GameConstants.h
 namespace GameConstants
 {
-constexpr float DEPTH_VALUE_MULTIPLIER = 1000.0f;
+constexpr float DEPTH_VALUE_MULTIPLIER = 10000.0f;
 }

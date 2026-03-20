@@ -55,13 +55,13 @@ protected:
 	int32 MaxHistorySamples = 500;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis", meta=(ClampMin="0", ClampMax="5000", UIMin="0", UIMax="20000"))
-	float FixedYRangePadding = 15.0f;
+	float FixedYRangePadding = 10.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|Smoothing")
-	bool bEnableDepthSmoothing = true;
+	bool bEnableDepthSmoothing = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|Smoothing", meta=(ClampMin="0.01", ClampMax="1.0", UIMin="0.05", UIMax="0.8"))
-	float DepthSmoothingAlpha = 0.25f;
+	float DepthSmoothingAlpha = 0.20f;
 
 	UPROPERTY(BlueprintReadOnly, Category="Depth Graph|Data")
 	TArray<float> DepthHistory;

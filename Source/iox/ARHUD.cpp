@@ -656,7 +656,10 @@ bool AARHUD::ComputeDepthMeanInBoundsUV(
     const int32 StartY = FMath::Clamp(FMath::RoundToInt(FMath::Min(MinUV.Y, MaxUV.Y) * static_cast<float>(Height - 1)), 0, Height - 1);
     const int32 EndY = FMath::Clamp(FMath::RoundToInt(FMath::Max(MinUV.Y, MaxUV.Y) * static_cast<float>(Height - 1)), 0, Height - 1);
 
+
     float DepthSum = 0.0;
+    float DepthSquaredSum = 0.0;
+
     int32 CandidateCount = 0;
     int32 Count = 0;
     float MinDepth = TNumericLimits<float>::Max();
@@ -690,23 +693,6 @@ bool AARHUD::ComputeDepthMeanInBoundsUV(
 
     OutSampleCount = Count;
     OutMeanDepthValue = static_cast<float>(DepthSum / static_cast<float>(Count));
-
-    float DepthSampleConfidence = 1.0;
-    if (CandidateCount > 0)
-    {
-        const float ValidRatio = static_cast<float>(Count) / static_cast<float>(CandidateCount);
-        DepthSampleConfidence = ValidRatio;
-    }
-
-    if (OutDepthSampleConfidence)
-    {
-        *OutDepthSampleConfidence = DepthSampleConfidence;
-    }
-
-    if (bUseDepthSampleConfidenceFilter && DepthSampleConfidence < MinDepthSampleConfidence)
-    {
-        return false;
-    }
 
     if (OutMinDepthValue)
     {
