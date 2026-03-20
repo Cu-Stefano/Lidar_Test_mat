@@ -18,7 +18,7 @@
 #include "ICameraWithDepth.h"
 #include "UDepthGraphWidget.h"
 #include "MainPanel.h"
-
+#include "Constants.h"
 namespace
 {
 const FName DepthToggleHitBoxName(TEXT("DepthToggleHitBox"));
@@ -316,9 +316,9 @@ void AARHUD::Tick(float DeltaSeconds)
         return;
     }
 
-    const float MeanDepthRaw = MeanDepthValue * 10000.0f;
-    const float MinDepthRaw = MinDepthValue * 10000.0f;
-    const float MaxDepthRaw = MaxDepthValue * 10000.0f;
+    const float MeanDepthRaw = MeanDepthValue * GameConstants::DEPTH_VALUE_MULTIPLIER;
+    const float MinDepthRaw = MinDepthValue * GameConstants::DEPTH_VALUE_MULTIPLIER;
+    const float MaxDepthRaw = MaxDepthValue * GameConstants::DEPTH_VALUE_MULTIPLIER;
 
     LastThoraxDepth = MeanDepthRaw;
     bHasThoraxDepthReading = true;
@@ -329,7 +329,7 @@ void AARHUD::Tick(float DeltaSeconds)
     
     if (bHasActiveSternumBounds && ComputeDepthMeanInBoundsUV(ActiveSternumMinUV, ActiveSternumMaxUV, SternumMeanDepthValue, SternumSampleCount, nullptr, nullptr, nullptr))
     {
-        LastSternumDepth = SternumMeanDepthValue * 10000.0f;
+        LastSternumDepth = SternumMeanDepthValue * GameConstants::DEPTH_VALUE_MULTIPLIER;
         bHasSternumDepthReading = true;
         RecordSternumDepthSample(LastSternumDepth);
     }
