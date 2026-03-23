@@ -77,6 +77,9 @@ protected:
     UPROPERTY(EditAnywhere, Category="UI")
     TObjectPtr<UTextureRenderTarget2D> CameraRenderTarget = nullptr;
 
+    UPROPERTY(EditAnywhere, Category="UI")
+    TObjectPtr<UTextureRenderTarget2D> DepthRenderTarget = nullptr;
+
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="UI")
     TScriptInterface<IIPoseDetector> PoseDetectorProvider;
 

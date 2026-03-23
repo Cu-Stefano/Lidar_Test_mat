@@ -3,11 +3,13 @@
 
 #include "CameraFactorySingleton.h"
 #include "ARUnrealCamera.h"
+#include "MockCamera.h"
 #include "ICameraWithDepth.h"
 
 // Definizione dei dispositivi supportati
 const TArray<FString> CameraFactorySingleton::SupportedCameraTypes = {
     TEXT("Unreal"),
+    TEXT("Mock"),
 };
 
 CameraFactorySingleton& CameraFactorySingleton::GetInstance()
@@ -24,6 +26,12 @@ TScriptInterface<ICameraWithDepth> CameraFactorySingleton::CreateCamera(const FS
     if (TypeName.Equals(TEXT("Unreal"), ESearchCase::IgnoreCase))
     {
         UARUnrealCamera* Provider = NewObject<UARUnrealCamera>(EffectiveOuter);
+        Camera.SetObject(Provider);
+        Camera.SetInterface(Cast<ICameraWithDepth>(Provider));
+    }
+    else if (TypeName.Equals(TEXT("Mock"), ESearchCase::IgnoreCase))
+    {
+        UMockCamera* Provider = NewObject<UMockCamera>(EffectiveOuter);
         Camera.SetObject(Provider);
         Camera.SetInterface(Cast<ICameraWithDepth>(Provider));
     }

@@ -111,7 +111,7 @@ void AARHUD::BeginPlay()
 
     // Camera + Depth Component
     CameraFactorySingleton& Factory = CameraFactorySingleton::GetInstance();
-    CameraWithDepthProvider = Factory.CreateCamera(TEXT("Unreal"), this);
+    CameraWithDepthProvider = Factory.CreateCamera(TEXT("Mock"), this);
 
     if (!CameraWithDepthProvider.GetObject())
     {
@@ -195,6 +195,15 @@ void AARHUD::ValidateEditorAssignments() const
         );
     }
 
+    if (!DepthRenderTarget)
+    {
+        UE_LOG(
+            LogTemp,
+            Warning,
+            TEXT("AARHUD: DepthRenderTarget is null. Assign RT_Depth in HUD class defaults.")
+        );
+    }
+
     if (!MainPanelClass)
     {
         UE_LOG(
@@ -257,6 +266,11 @@ void AARHUD::Tick(float DeltaSeconds)
     if (CameraRenderTarget && CameraMaterial)
     {
         UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, CameraRenderTarget, CameraMaterial);
+    }
+
+    if (DepthRenderTarget && DepthMaterial)
+    {
+        UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, DepthRenderTarget, DepthMaterial);
     }
 
     IIPoseDetector* PoseDetector = PoseDetectorProvider.GetInterface();
