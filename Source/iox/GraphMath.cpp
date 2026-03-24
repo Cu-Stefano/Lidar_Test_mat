@@ -7,8 +7,8 @@ namespace GraphMath
     TArray<FBreathPoint> FindExtrema(
     const TArray<float>& XValues,
     const TArray<float>& YValues,
-    float Prominence,      // % dell'ampiezza totale (es. 0.15 = 15%)
-    int32 MinDistance)     // campioni minimi tra due estremi
+    float Prominence,      // ampiezza
+    int32 MinDistance)     // frequenza minima
 {
     TArray<FBreathPoint> Result;
 

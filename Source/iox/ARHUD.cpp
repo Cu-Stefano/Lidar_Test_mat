@@ -19,76 +19,7 @@
 #include "UDepthGraphWidget.h"
 #include "MainPanel.h"
 #include "Constants.h"
-namespace
-{
-const FName DepthToggleHitBoxName(TEXT("DepthToggleHitBox"));
-
-enum class EThoraxJointRole : uint8
-{
-    Unknown,
-    Torso,
-    LeftShoulder,
-    RightShoulder,
-    LeftHip,
-    RightHip,
-};
-
-const TMap<FString, EThoraxJointRole>& GetThoraxJointRoleDictionary()
-{
-    static const TMap<FString, EThoraxJointRole> Dictionary = {
-        {TEXT("neck_1_joint"), EThoraxJointRole::Torso},
-        {TEXT("root"), EThoraxJointRole::Torso},
-        {TEXT("left_shoulder_1_joint"), EThoraxJointRole::LeftShoulder},
-        {TEXT("right_shoulder_1_joint"), EThoraxJointRole::RightShoulder},
-        {TEXT("left_upleg_joint"), EThoraxJointRole::LeftHip},
-        {TEXT("right_upleg_joint"), EThoraxJointRole::RightHip}
-    };
-
-    return Dictionary;
-}
-
-EThoraxJointRole ResolveThoraxJointRole(const FString& RawName)
-{
-    const FString NameLower = RawName.ToLower();
-    if (const EThoraxJointRole* Role = GetThoraxJointRoleDictionary().Find(NameLower))
-    {
-        return *Role;
-    }
-
-    return EThoraxJointRole::Unknown;
-}
-
-UUDepthGraphWidget* FindDepthGraphWidget(UUserWidget* RootWidget)
-{
-    if (!RootWidget)
-    {
-        return nullptr;
-    }
-
-    if (UUDepthGraphWidget* DirectGraphWidget = Cast<UUDepthGraphWidget>(RootWidget))
-    {
-        return DirectGraphWidget;
-    }
-
-    UWidgetTree* Tree = RootWidget->WidgetTree;
-    if (!Tree)
-    {
-        return nullptr;
-    }
-
-    TArray<UWidget*> AllWidgets;
-    Tree->GetAllWidgets(AllWidgets);
-    for (UWidget* Widget : AllWidgets)
-    {
-        if (UUDepthGraphWidget* GraphWidget = Cast<UUDepthGraphWidget>(Widget))
-        {
-            return GraphWidget;
-        }
-    }
-
-    return nullptr;
-}
-}
+// Note: Enums, joint dictionaries and helper functions moved to ThoraxJointHelper.h/.cpp
 
 AARHUD::AARHUD()
 {
@@ -153,8 +84,9 @@ void AARHUD::BeginPlay()
 
     UpdateDepthWidgetState();
     UpdateMainPanelState();
-    PushThoraxDepthToMainPanel();
+    UpdateMainPanelDepth();
 
+    DepthSampler = NewObject<UDepthSampler>(this);
 }
 
 void AARHUD::ValidateEditorAssignments() const
@@ -309,6 +241,14 @@ void AARHUD::Tick(float DeltaSeconds)
 
     bHasActiveThoraxBounds = true;
 
+    if (!DepthSampler || !DepthSampler->CaptureFrame(DepthMaterial, CameraRenderTarget, bUseFloat32DepthSampling))
+    {
+        bHasThoraxDepthReading = false;
+        bHasSternumDepthReading = false;
+        UE_LOG(LogTemp, Warning, TEXT("Depth frame data capture failed"));
+        return;
+    }
+
     const FVector2D ThoraxCenterUV = 0.5f * (ThoraxMinUV + ThoraxMaxUV);
 
     float MeanDepthValue = 0.0f;
@@ -316,7 +256,9 @@ void AARHUD::Tick(float DeltaSeconds)
     float MaxDepthValue = 0.0f;
     float DepthSampleConfidence = 0.0f;
     int32 SampleCount = 0;
-    if (!ComputeDepthMeanInBoundsUV(ThoraxMinUV, ThoraxMaxUV, MeanDepthValue, SampleCount, &MinDepthValue, &MaxDepthValue, &DepthSampleConfidence))
+
+    //Thoarx
+    if (!DepthSampler->ComputeMeanInBoundsUV(ThoraxMinUV, ThoraxMaxUV, MeanDepthValue, SampleCount, MinDepthValue, MaxDepthValue, DepthSampleConfidence))
     {
         bHasThoraxDepthReading = false;
         bHasActiveThoraxBounds = false;
@@ -338,10 +280,12 @@ void AARHUD::Tick(float DeltaSeconds)
     bHasThoraxDepthReading = true;
     RecordThoraxDepthSample(MeanDepthRaw);
 
+    //Sternum
     float SternumMeanDepthValue = 0.0f;
     int32 SternumSampleCount = 0;
+    float DummyMin, DummyMax, DummyConf;
     
-    if (bHasActiveSternumBounds && ComputeDepthMeanInBoundsUV(ActiveSternumMinUV, ActiveSternumMaxUV, SternumMeanDepthValue, SternumSampleCount, nullptr, nullptr, nullptr))
+    if (bHasActiveSternumBounds && DepthSampler->ComputeMeanInBoundsUV(ActiveSternumMinUV, ActiveSternumMaxUV, SternumMeanDepthValue, SternumSampleCount, DummyMin, DummyMax, DummyConf))
     {
         LastSternumDepth = SternumMeanDepthValue * GameConstants::DEPTH_VALUE_MULTIPLIER;
         bHasSternumDepthReading = true;
@@ -352,44 +296,20 @@ void AARHUD::Tick(float DeltaSeconds)
         bHasSternumDepthReading = false;
     }
 
-    PushThoraxDepthToMainPanel();
+    // Zone grid del torace
+    ComputeThoraxZoneDepths(ThoraxMinUV, ThoraxMaxUV);
 
-    if (true)
-    {
-        if (bLogThoraxDepthIn)
-        {
-            UE_LOG(
-                LogTemp,
-                Log,
-                TEXT("Thorax depth mean: %.6f, min: %.6f, max: %.6f, samples=%d, uv=(%.3f, %.3f)"),
-                MeanDepthRaw,
-                MinDepthRaw,
-                MaxDepthRaw,
-                SampleCount,
-                ThoraxCenterUV.X,
-                ThoraxCenterUV.Y
-            );
-
-            UE_LOG(
-                LogTemp,
-                Verbose,
-                TEXT("Thorax depth confidence: %.2f (threshold %.2f)"),
-                DepthSampleConfidence,
-                MinDepthSampleConfidence
-            );
-        }
-        
-    }
-    
+    UpdateMainPanelDepth();
 }
 
 void AARHUD::DrawHUD()
 {
     Super::DrawHUD();
 
-    DrawDepthToggleButton();
-    DrawChestSamplingArea();
-    DrawSternumArea();
+    OverlayDrawer.DrawDepthToggleButton();
+    OverlayDrawer.DrawChestSamplingArea();
+    OverlayDrawer.DrawSternumArea();
+    OverlayDrawer.DrawThoraxZoneDots();
 
     if (!Canvas || !PoseDetectorProvider.GetObject())
     {
@@ -398,87 +318,22 @@ void AARHUD::DrawHUD()
 
     if (bDrawJointDots || bDrawJointLabels)
     {
-        DrawJointsOverlay();
+        OverlayDrawer.DrawJointsOverlay();
     }
-
 }
 
 void AARHUD::NotifyHitBoxClick(FName BoxName)
 {
     Super::NotifyHitBoxClick(BoxName);
 
-    if (BoxName == DepthToggleHitBoxName)
+    if (BoxName == HUDConstants::DepthToggleHitBoxName)
     {
         bShowDepthOverlay = !bShowDepthOverlay;
         UpdateDepthWidgetState();
     }
 }
 
-void AARHUD::DrawJointsOverlay()
-{
-    if (!bDrawJointDots && !bDrawJointLabels)
-    {
-        return;
-    }
-
-    IIPoseDetector* PoseDetector = PoseDetectorProvider.GetInterface();
-    if (!PoseDetector) return;
-
-    const TArray<FPoseJoint>& Joints = PoseDetector->GetDetectedJoints();
-    
-    if (Joints.Num() == 0) return;
-
-    for (const FPoseJoint& Joint : Joints)
-    {
-        if (Joint.Confidence < MinJointConfidence)
-        {
-            continue;
-        }
-
-        const FVector2D ScreenPos = ToScreenSpace(Joint.X, Joint.Y);
-        const float DotHalf = JointDotSize * 0.5f;
-        const float DotX = ScreenPos.X - DotHalf;
-        const float DotY = ScreenPos.Y - DotHalf;
-
-        if (bDrawJointDots && JointDotMaterial)
-        {
-            DrawMaterial(
-                JointDotMaterial,
-            DotX,
-            DotY,
-                JointDotSize,
-                JointDotSize,
-                0.0f,
-                0.0f,
-                1.0f,
-                1.0f,
-                1.0f,
-                false,
-                0.0f,
-                FVector2D::ZeroVector
-            );
-        }
-        else if (bDrawJointDots)
-        {
-            // Fallback marker when no dot material is assigned in the HUD defaults.
-            DrawRect(JointTextColor, DotX, DotY, JointDotSize, JointDotSize);
-        }
-
-        if (bDrawJointLabels)
-        {
-            const FString JointLabel = Joint.Name.IsEmpty() ? TEXT("joint") : Joint.Name;
-            DrawText(
-                JointLabel,
-                JointTextColor,
-                ScreenPos.X,
-                ScreenPos.Y + JointTextYOffset,
-                JointFont,
-                JointTextScale,
-                false
-            );
-        }
-    }
-}
+// Methods migrated to HUDOverlayDrawer
 
 bool AARHUD::TryGetThoraxBoundsUV(const TArray<FPoseJoint>& Joints, FVector2D& OutMinUV, FVector2D& OutMaxUV) const
 {
@@ -595,130 +450,72 @@ bool AARHUD::TryGetSternumBoundsUV(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV,
     return true;
 }
 
-
-bool AARHUD::ComputeDepthMeanInBoundsUV(
-    const FVector2D& MinUV,
-    const FVector2D& MaxUV,
-    float& OutMeanDepthValue,
-    int32& OutSampleCount,
-    float* OutMinDepthValue,
-    float* OutMaxDepthValue,
-    float* OutDepthSampleConfidence)
+void AARHUD::ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV)
 {
-    if (!DepthMaterial)
+    const int32 N = FMath::Max(1, NumThoraxZones);
+    const int32 TotalZones = N * N;
+
+    ThoraxZoneDepths.SetNum(TotalZones);
+    for (float& V : ThoraxZoneDepths) { V = -1.0f; }
+
+    const float URange = ThoraxMaxUV.X - ThoraxMinUV.X;
+    const float VRange = ThoraxMaxUV.Y - ThoraxMinUV.Y;
+
+    if (URange <= 0.0f || VRange <= 0.0f)
     {
-        return false;
+        return;
     }
 
-    int32 DepthRTWidth = 256;
-    int32 DepthRTHeight = 256;
+    const float CellU = URange / static_cast<float>(N);
+    const float CellV = VRange / static_cast<float>(N);
 
-    if (CameraRenderTarget && CameraRenderTarget->SizeX > 0 && CameraRenderTarget->SizeY > 0)
+    for (int32 Row = 0; Row < N; ++Row)
     {
-        DepthRTWidth = CameraRenderTarget->SizeX;
-        DepthRTHeight = CameraRenderTarget->SizeY;
-    }
-
-    if (!DepthDebugRenderTarget || DepthDebugRenderTarget->SizeX != DepthRTWidth || DepthDebugRenderTarget->SizeY != DepthRTHeight)
-    {
-        ETextureRenderTargetFormat DepthRTFormat;
-        
-        DepthRTFormat = bUseFloat32DepthSampling
-            ? ETextureRenderTargetFormat::RTF_RGBA32f
-            : ETextureRenderTargetFormat::RTF_RGBA16f;
-        
-        DepthDebugRenderTarget = UKismetRenderingLibrary::CreateRenderTarget2D(
-            this,
-            DepthRTWidth,
-            DepthRTHeight,
-            DepthRTFormat
-        );
-
-        if (DepthDebugRenderTarget)
+        for (int32 Col = 0; Col < N; ++Col)
         {
-            DepthDebugRenderTarget->bForceLinearGamma = true;
-            DepthDebugRenderTarget->UpdateResourceImmediate(false);
-        }
-    }
+            FVector2D ZoneMin, ZoneMax;
+            ZoneMin.X = ThoraxMinUV.X + Col * CellU;
+            ZoneMin.Y = ThoraxMinUV.Y + Row * CellV;
+            ZoneMax.X = ZoneMin.X + CellU;
+            ZoneMax.Y = ZoneMin.Y + CellV;
 
-    if (!DepthDebugRenderTarget)
-    {
-        return false;
-    }
-
-    UKismetRenderingLibrary::DrawMaterialToRenderTarget(this, DepthDebugRenderTarget, DepthMaterial);
-
-    FTextureRenderTargetResource* RTResource = DepthDebugRenderTarget->GameThread_GetRenderTargetResource();
-    if (!RTResource)
-    {
-        return false;
-    }
-
-    TArray<FLinearColor> PixelData;
-    FReadSurfaceDataFlags ReadFlags;
-    ReadFlags.SetLinearToGamma(false);
-    if (!RTResource->ReadLinearColorPixels(PixelData, ReadFlags) || PixelData.Num() == 0)
-    {
-        return false;
-    }
-
-    const int32 Width = DepthDebugRenderTarget->SizeX;
-    const int32 Height = DepthDebugRenderTarget->SizeY;
-
-    const int32 StartX = FMath::Clamp(FMath::RoundToInt(FMath::Min(MinUV.X, MaxUV.X) * static_cast<float>(Width - 1)), 0, Width - 1);
-    const int32 EndX = FMath::Clamp(FMath::RoundToInt(FMath::Max(MinUV.X, MaxUV.X) * static_cast<float>(Width - 1)), 0, Width - 1);
-    const int32 StartY = FMath::Clamp(FMath::RoundToInt(FMath::Min(MinUV.Y, MaxUV.Y) * static_cast<float>(Height - 1)), 0, Height - 1);
-    const int32 EndY = FMath::Clamp(FMath::RoundToInt(FMath::Max(MinUV.Y, MaxUV.Y) * static_cast<float>(Height - 1)), 0, Height - 1);
-
-
-    float DepthSum = 0.0;
-    float DepthSquaredSum = 0.0;
-
-    int32 CandidateCount = 0;
-    int32 Count = 0;
-    float MinDepth = TNumericLimits<float>::Max();
-    float MaxDepth = TNumericLimits<float>::Lowest();
-
-    for (int32 Y = StartY; Y <= EndY; ++Y)
-    {
-        for (int32 X = StartX; X <= EndX; ++X)
-        {
-            ++CandidateCount;
-
-            const FLinearColor& Pixel = PixelData[Y * Width + X];
-            const float PixelDepth = Pixel.R; 
-
-            if (!FMath::IsFinite(PixelDepth))
+            float ZoneMean = 0.0f;
+            int32 ZoneSamples = 0;
+            float DummyMin, DummyMax, DummyConf;
+            if (DepthSampler->ComputeMeanInBoundsUV(ZoneMin, ZoneMax, ZoneMean, ZoneSamples, DummyMin, DummyMax, DummyConf))
             {
-                continue;
+                ThoraxZoneDepths[Row * N + Col] = ZoneMean * GameConstants::DEPTH_VALUE_MULTIPLIER;
             }
-
-            DepthSum += static_cast<float>(PixelDepth);
-            MinDepth = FMath::Min(MinDepth, PixelDepth);
-            MaxDepth = FMath::Max(MaxDepth, PixelDepth);
-            ++Count;
         }
     }
 
-    if (Count <= 0)
+    if (bLogThoraxZoneDepths)
     {
-        return false;
+        // ---- Costruiamo una stringa con tutti i valori in una sola stampa ----
+        FString ZoneLog = FString::Printf(TEXT("[ThoraxZones %dx%d]"), N, N);
+        for (int32 Row = 0; Row < N; ++Row)
+        {
+            ZoneLog += TEXT(" | Row") + FString::FromInt(Row) + TEXT(":");
+            for (int32 Col = 0; Col < N; ++Col)
+            {
+                const float Val = ThoraxZoneDepths[Row * N + Col];
+                if (Val < 0.0f)
+                {
+                    ZoneLog += TEXT(" [--]");
+                }
+                else
+                {
+                    ZoneLog += FString::Printf(TEXT(" [%.3f]"), Val);
+                }
+            }
+        }
+        UE_LOG(LogTemp, Log, TEXT("%s"), *ZoneLog);
     }
-
-    OutSampleCount = Count;
-    OutMeanDepthValue = static_cast<float>(DepthSum / static_cast<float>(Count));
-
-    if (OutMinDepthValue)
-    {
-        *OutMinDepthValue = MinDepth;
-    }
-    if (OutMaxDepthValue)
-    {
-        *OutMaxDepthValue = MaxDepth;
-    }
-
-    return true;
 }
+
+
+
+// Depth sampling methods migrated to UDepthSampler
 
 void AARHUD::PushMaterialToWidget(UMaterialInterface* Material)
 {
@@ -776,173 +573,7 @@ void AARHUD::UpdateMainPanelState()
     );
 }
 
-void AARHUD::DrawDepthToggleButton()
-{
-    if (!Canvas || !bShowDepthToggleButton)
-    {
-        return;
-    }
-
-    const FLinearColor FillColor = bShowDepthOverlay ? DepthToggleButtonOnColor : DepthToggleButtonOffColor;
-    DrawRect(
-        FillColor,
-        DepthToggleButtonPosition.X,
-        DepthToggleButtonPosition.Y,
-        DepthToggleButtonSize.X,
-        DepthToggleButtonSize.Y
-    );
-
-    const FString Label = bShowDepthOverlay ? TEXT("Depth: ON") : TEXT("Depth: OFF");
-    DrawText(
-        Label,
-        FLinearColor::White,
-        DepthToggleButtonPosition.X + 12.0f,
-        DepthToggleButtonPosition.Y + 12.0f,
-        JointFont,
-        0.9f,
-        false
-    );
-
-    AddHitBox(
-        DepthToggleButtonPosition,
-        DepthToggleButtonSize,
-        DepthToggleHitBoxName,
-        true,
-        0
-    );
-}
-
-void AARHUD::DrawChestSamplingArea()
-{
-    if (!Canvas || !bShowChestSamplingArea)
-    {
-        return;
-    }
-
-    if (!bHasActiveThoraxBounds)
-    {
-        return;
-    }
-
-    const float Width = Canvas->ClipX;
-    const float Height = Canvas->ClipY;
-    if (Width <= 1.0f || Height <= 1.0f)
-    {
-        return;
-    }
-
-    const float MinX = FMath::Min(ActiveThoraxMinUV.X, ActiveThoraxMaxUV.X);
-    const float MaxX = FMath::Max(ActiveThoraxMinUV.X, ActiveThoraxMaxUV.X);
-    const float MinY = FMath::Min(ActiveThoraxMinUV.Y, ActiveThoraxMaxUV.Y);
-    const float MaxY = FMath::Max(ActiveThoraxMinUV.Y, ActiveThoraxMaxUV.Y);
-
-    float RectX = MinX * Width;
-    float RectY = MinY * Height;
-    float RectW = (MaxX - MinX) * Width;
-    float RectH = (MaxY - MinY) * Height;
-
-    RectX = FMath::Clamp(RectX, 0.0f, Width - 1.0f);
-    RectY = FMath::Clamp(RectY, 0.0f, Height - 1.0f);
-    RectW = FMath::Clamp(RectW, 1.0f, Width - RectX);
-    RectH = FMath::Clamp(RectH, 1.0f, Height - RectY);
-
-    if (ChestAreaMaterial)
-    {
-        DrawMaterial(
-            ChestAreaMaterial,
-            RectX,
-            RectY,
-            RectW,
-            RectH,
-            0.0f,
-            0.0f,
-            1.0f,
-            1.0f,
-            1.0f,
-            false,
-            0.0f,
-            FVector2D::ZeroVector
-        );
-    }
-    else
-    {
-        DrawRect(ChestAreaFallbackColor, RectX, RectY, RectW, RectH);
-    }
-
-    if (ChestAreaOutlineThickness > 0.0f)
-    {
-        DrawLine(RectX, RectY, RectX + RectW, RectY, ChestAreaOutlineColor, ChestAreaOutlineThickness);
-        DrawLine(RectX, RectY + RectH, RectX + RectW, RectY + RectH, ChestAreaOutlineColor, ChestAreaOutlineThickness);
-        DrawLine(RectX, RectY, RectX, RectY + RectH, ChestAreaOutlineColor, ChestAreaOutlineThickness);
-        DrawLine(RectX + RectW, RectY, RectX + RectW, RectY + RectH, ChestAreaOutlineColor, ChestAreaOutlineThickness);
-    }
-}
-
-void AARHUD::DrawSternumArea()
-{
-    if (!Canvas || !bShowSternumSamplingArea)
-    {
-        return;
-    }
-
-    if (!bHasActiveSternumBounds)
-    {
-        return;
-    }
-
-    const float Width = Canvas->ClipX;
-    const float Height = Canvas->ClipY;
-    if (Width <= 1.0f || Height <= 1.0f)
-    {
-        return;
-    }
-
-    const float MinX = FMath::Min(ActiveSternumMinUV.X, ActiveSternumMaxUV.X);
-    const float MaxX = FMath::Max(ActiveSternumMinUV.X, ActiveSternumMaxUV.X);
-    const float MinY = FMath::Min(ActiveSternumMinUV.Y, ActiveSternumMaxUV.Y);
-    const float MaxY = FMath::Max(ActiveSternumMinUV.Y, ActiveSternumMaxUV.Y);
-
-    float RectX = MinX * Width;
-    float RectY = MinY * Height;
-    float RectW = (MaxX - MinX) * Width;
-    float RectH = (MaxY - MinY) * Height;
-
-    RectX = FMath::Clamp(RectX, 0.0f, Width - 1.0f);
-    RectY = FMath::Clamp(RectY, 0.0f, Height - 1.0f);
-    RectW = FMath::Clamp(RectW, 1.0f, Width - RectX);
-    RectH = FMath::Clamp(RectH, 1.0f, Height - RectY);
-
-    if (SternumAreaMaterial)
-    {
-        DrawMaterial(
-            SternumAreaMaterial,
-            RectX,
-            RectY,
-            RectW,
-            RectH,
-            0.0f,
-            0.0f,
-            1.0f,
-            1.0f,
-            1.0f,
-            false,
-            0.0f,
-            FVector2D::ZeroVector
-        );
-    }
-    else
-    {
-        DrawRect(SternumAreaFallbackColor, RectX, RectY, RectW, RectH);
-    }
-
-    if (SternumAreaOutlineThickness > 0.0f)
-    {
-        DrawLine(RectX, RectY, RectX + RectW, RectY, SternumAreaOutlineColor, SternumAreaOutlineThickness);
-        DrawLine(RectX, RectY + RectH, RectX + RectW, RectY + RectH, SternumAreaOutlineColor, SternumAreaOutlineThickness);
-        DrawLine(RectX, RectY, RectX, RectY + RectH, SternumAreaOutlineColor, SternumAreaOutlineThickness);
-        DrawLine(RectX + RectW, RectY, RectX + RectW, RectY + RectH, SternumAreaOutlineColor, SternumAreaOutlineThickness);
-    }
-}
+// Drawing methods migrated to HUDOverlayDrawer
 
 void AARHUD::RecordThoraxDepthSample(const float DepthUnits)
 {
@@ -978,7 +609,7 @@ void AARHUD::RecordSternumDepthSample(const float DepthUnits)
     }
 }
 
-void AARHUD::PushThoraxDepthToMainPanel()
+void AARHUD::UpdateMainPanelDepth()
 {
     if (!bEnableThoraxDepthGraphUpdates || !MainPanelWidget)
     {

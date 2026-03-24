@@ -7,6 +7,9 @@
 #include "UObject/ScriptInterface.h"
 #include "ICameraWithDepth.h"
 #include "IPoseDetector.h"
+#include "ThoraxJointHelper.h"
+#include "DepthSampler.h"
+#include "HUDOverlayDrawer.h"
 #include "ARHUD.generated.h"
 
 class UUserWidget;
@@ -23,6 +26,8 @@ UCLASS()
 class IOX_API AARHUD : public AHUD
 {
 	GENERATED_BODY()
+
+    friend class FHUDOverlayDrawer;
 
 public:
     AARHUD();
@@ -173,6 +178,29 @@ protected:
     UPROPERTY(EditAnywhere, Category="Pose|DepthDebug", meta=(ClampMin="0.0", ClampMax="1.0"))
     float MinDepthSampleConfidence = 0.45f;
 
+    // ================= Thorax Zone Grid =================
+    // Numero di zone (NxN) in cui suddividere il torace. Configurabile dall'editor.
+    UPROPERTY(EditAnywhere, Category="Pose|ThoraxZones", meta=(ClampMin="1", ClampMax="10"))
+    int32 NumThoraxZones = 3;
+
+    // Se true, stampa a schermo (UE_LOG) il depth mean di ogni zona ad ogni frame.
+    UPROPERTY(EditAnywhere, Category="Pose|ThoraxZones")
+    bool bLogThoraxZoneDepths = true;
+
+    // Se true, disegna un puntino al centro di ogni zona del torace.
+    UPROPERTY(EditAnywhere, Category="Pose|ThoraxZones")
+    bool bDrawThoraxZoneDots = true;
+
+    UPROPERTY(EditAnywhere, Category="Pose|ThoraxZones")
+    FLinearColor ThoraxZoneDotColor = FLinearColor::White;
+
+    UPROPERTY(EditAnywhere, Category="Pose|ThoraxZones")
+    float ThoraxZoneDotSize = 8.0f;
+
+    // Risultati dell'ultimo frame: depth mean per ogni cella (riga*NumZones + colonna).
+    UPROPERTY(Transient)
+    TArray<float> ThoraxZoneDepths;
+
     UPROPERTY(Transient)
     FVector2D ActiveThoraxMinUV = FVector2D::ZeroVector;
 
@@ -183,7 +211,7 @@ protected:
     bool bHasActiveThoraxBounds = false;
 
     UPROPERTY(Transient)
-    TObjectPtr<UTextureRenderTarget2D> DepthDebugRenderTarget = nullptr;
+    TObjectPtr<UDepthSampler> DepthSampler = nullptr;
 
     UPROPERTY(Transient)
     float LastThoraxDepth = 0.0f;
@@ -244,6 +272,8 @@ protected:
     UPROPERTY(Transient)
     TArray<float> SternumDepthHistory;
 
+    FHUDOverlayDrawer OverlayDrawer{this};
+
 private:
     void ValidateEditorAssignments() const;
     void PushMaterialToWidget(UMaterialInterface* Material);
@@ -252,20 +282,23 @@ private:
     void DrawDepthToggleButton();
     void DrawChestSamplingArea();
     void DrawSternumArea();
+    void DrawThoraxZoneDots();
     FVector2D ToScreenSpace(float X, float Y) const;
     void DrawJointsOverlay();
     void RecordThoraxDepthSample(float DepthUnits);
     void RecordSternumDepthSample(float DepthUnits);
-    void PushThoraxDepthToMainPanel();
+    void UpdateMainPanelDepth();
     bool TryGetThoraxBoundsUV(const TArray<FPoseJoint>& Joints, FVector2D& OutMinUV, FVector2D& OutMaxUV) const;
     bool TryGetSternumBoundsUV(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV, FVector2D& OutMinUV, FVector2D& OutMaxUV, float SternumAreaSize) const;
+    bool CaptureDepthFrameData();
     bool ComputeDepthMeanInBoundsUV(
         const FVector2D& MinUV,
         const FVector2D& MaxUV,
         float& OutMeanDepthValue,
         int32& OutSampleCount,
-        float* OutMinDepthValue,
-        float* OutMaxDepthValue,
-        float* OutDepthSampleConfidence
+        float& OutMinDepthValue,
+        float& OutMaxDepthValue,
+        float& OutDepthSampleConfidence
     );
+    void ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV);
 };

@@ -317,10 +317,9 @@ int32 UUDepthGraphWidget::NativePaint(
 		LineThickness
 	);
 
-	// Disegno dei marcatori dei punti minimi e massimi (rossi)
+	// Disegno dei marcatori dei punti minimi e massimi
 	if (SmoothedDepths.Num() >= 3)
 	{
-		// 30 campioni di base per ignorare piccoli sbalzi, e abbassato a 0.05 la tolleranza al rumore
 		TArray<GraphMath::FBreathPoint> Extrema = GraphMath::FindExtrema(ScreenXs, SmoothedDepths, 0.05f, 30);
 		const float ExtremesSize = FMath::Max(5.0f, CurrentPointSize * 1.5f);
 		
