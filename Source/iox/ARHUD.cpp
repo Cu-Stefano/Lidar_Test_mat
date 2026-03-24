@@ -111,7 +111,7 @@ void AARHUD::BeginPlay()
 
     // Camera + Depth Component
     CameraFactorySingleton& Factory = CameraFactorySingleton::GetInstance();
-    CameraWithDepthProvider = Factory.CreateCamera(TEXT("Mock"), this);
+    CameraWithDepthProvider = Factory.CreateCamera(TEXT("Unreal"), this);
 
     if (!CameraWithDepthProvider.GetObject())
     {

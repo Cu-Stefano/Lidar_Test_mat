@@ -2,6 +2,7 @@
 
 
 #include "UDepthGraphWidget.h"
+#include "GraphMath.h"
 
 #include "Fonts/SlateFontInfo.h"
 #include "Rendering/DrawElements.h"
@@ -264,16 +265,10 @@ int32 UUDepthGraphWidget::NativePaint(
 	TArray<FVector2D> GraphPoints;
 	GraphPoints.Reserve(SamplesToDraw);
 
-	// Struttura per tracciare il minimo e il massimo ogni tot elementi
-	struct FChunkExtremes
-	{
-		float MinDepth = TNumericLimits<float>::Max();
-		float MaxDepth = TNumericLimits<float>::Lowest();
-		FVector2D MinPoint = FVector2D::ZeroVector;
-		FVector2D MaxPoint = FVector2D::ZeroVector;
-	};
-	TMap<int32, FChunkExtremes> Chunks;
-	const int32 ChunkSize = 500;
+	TArray<float> SmoothedDepths;
+	TArray<float> ScreenXs;
+	SmoothedDepths.Reserve(SamplesToDraw);
+	ScreenXs.Reserve(SamplesToDraw);
 
 	const float DepthRange = MaxDepth - MinDepth;
 	const float SmoothingAlpha = FMath::Clamp(DepthSmoothingAlpha, 0.01f, 1.0f);
@@ -307,21 +302,8 @@ int32 UUDepthGraphWidget::NativePaint(
 		const FVector2D CurrentPoint(X, Y);
 		GraphPoints.Add(CurrentPoint);
 
-		// Calcolo dei minimi e massimi per blocco (chunk) da 500 sample
-		const int32 GlobalIndex = StartIndex + LocalIndex;
-		const int32 ChunkIndex = GlobalIndex / ChunkSize;
-		FChunkExtremes& Extreme = Chunks.FindOrAdd(ChunkIndex);
-
-		if (SmoothedValue < Extreme.MinDepth)
-		{
-			Extreme.MinDepth = SmoothedValue;
-			Extreme.MinPoint = CurrentPoint;
-		}
-		if (SmoothedValue > Extreme.MaxDepth)
-		{
-			Extreme.MaxDepth = SmoothedValue;
-			Extreme.MaxPoint = CurrentPoint;
-		}
+		SmoothedDepths.Add(SmoothedValue);
+		ScreenXs.Add(X);
 	}
 
 	FSlateDrawElement::MakeLines(
@@ -336,17 +318,22 @@ int32 UUDepthGraphWidget::NativePaint(
 	);
 
 	// Disegno dei marcatori dei punti minimi e massimi (rossi)
-	if (Chunks.Num() > 0)
+	if (SmoothedDepths.Num() >= 3)
 	{
+		// 30 campioni di base per ignorare piccoli sbalzi, e abbassato a 0.05 la tolleranza al rumore
+		TArray<GraphMath::FBreathPoint> Extrema = GraphMath::FindExtrema(ScreenXs, SmoothedDepths, 0.05f, 30);
 		const float ExtremesSize = FMath::Max(5.0f, CurrentPointSize * 1.5f);
-		for (const auto& Kvp : Chunks)
+		
+		for (const GraphMath::FBreathPoint& Extreme : Extrema)
 		{
-			const FChunkExtremes& Extreme = Kvp.Value;
-			
-			// Punto Minimo
-			if (Extreme.MinDepth != TNumericLimits<float>::Max())
+			if (Extreme.Index >= 0 && Extreme.Index < GraphPoints.Num())
 			{
-				const FVector2D MarkerTopLeft = Extreme.MinPoint - FVector2D(ExtremesSize * 0.5f, ExtremesSize * 0.5f);
+				const FVector2D& ExtremePoint = GraphPoints[Extreme.Index];
+				const FVector2D MarkerTopLeft = ExtremePoint - FVector2D(ExtremesSize * 0.5f, ExtremesSize * 0.5f);
+				
+				// Usa colori diversi: Verde per massimi (Peak), Rosso per minimi (Valley)
+				FLinearColor MarkerColor = Extreme.bIsPeak ? FLinearColor::Green : FLinearColor::Red;
+
 				FSlateDrawElement::MakeBox(
 					OutDrawElements,
 					BaseLayer + 5,
@@ -356,24 +343,7 @@ int32 UUDepthGraphWidget::NativePaint(
 					),
 					WhiteBrush,
 					ESlateDrawEffect::None,
-					FLinearColor::Red
-				);
-			}
-			
-			// Punto Massimo
-			if (Extreme.MaxDepth != TNumericLimits<float>::Lowest())
-			{
-				const FVector2D MarkerTopLeft = Extreme.MaxPoint - FVector2D(ExtremesSize * 0.5f, ExtremesSize * 0.5f);
-				FSlateDrawElement::MakeBox(
-					OutDrawElements,
-					BaseLayer + 5,
-					AllottedGeometry.ToPaintGeometry(
-						FVector2f(ExtremesSize, ExtremesSize),
-						FSlateLayoutTransform(FVector2f(static_cast<float>(MarkerTopLeft.X), static_cast<float>(MarkerTopLeft.Y)))
-					),
-					WhiteBrush,
-					ESlateDrawEffect::None,
-					FLinearColor::Red
+					MarkerColor
 				);
 			}
 		}
