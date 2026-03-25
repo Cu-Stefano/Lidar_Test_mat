@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
-#include "ICameraWithDepth.h"
+#include "Camera/ICameraWithDepth.h"
 #include "ARUnrealCamera.generated.h"
 
 
@@ -16,6 +16,6 @@ class IOX_API UARUnrealCamera : public UObject, public ICameraWithDepth
 public:	
 	UARUnrealCamera();
 
-	virtual UTexture* GetDepthTexture() const override;
-	virtual UTexture* GetCameraTexture() const override;
+	virtual TObjectPtr<UTexture> GetDepthTexture() const override;
+	virtual TObjectPtr<UTexture> GetCameraTexture() const override;
 };

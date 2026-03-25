@@ -7,6 +7,8 @@ public class iox : ModuleRules
 	public iox(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+
+		PublicIncludePaths.AddRange(new string[] { "iox" });
 	
 		PublicDependencyModuleNames.AddRange(new string[] {
             "Core",

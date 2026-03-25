@@ -1,13 +1,11 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "HUDOverlayDrawer.h"
-
-#include "ARHUD.h"
-#include "IPoseDetector.h"
+#include "UI/HUDOverlayDrawer.h"
+#include "UI/ARHUD.h"
+#include "Pose/IPoseDetector.h"
 #include "Engine/Canvas.h"
 #include "Engine/Font.h"
 
-// -----------------------------------------------------------------------
 
 void FHUDOverlayDrawer::DrawDepthToggleButton()
 {
@@ -47,8 +45,6 @@ void FHUDOverlayDrawer::DrawDepthToggleButton()
         0
     );
 }
-
-// -----------------------------------------------------------------------
 
 void FHUDOverlayDrawer::DrawChestSamplingArea()
 {
@@ -99,8 +95,6 @@ void FHUDOverlayDrawer::DrawChestSamplingArea()
     }
 }
 
-// -----------------------------------------------------------------------
-
 void FHUDOverlayDrawer::DrawSternumArea()
 {
     if (!HUD->Canvas || !HUD->bShowSternumSamplingArea || !HUD->bHasActiveSternumBounds)
@@ -150,8 +144,6 @@ void FHUDOverlayDrawer::DrawSternumArea()
     }
 }
 
-// -----------------------------------------------------------------------
-
 void FHUDOverlayDrawer::DrawThoraxZoneDots()
 {
     if (!HUD->Canvas || !HUD->bDrawThoraxZoneDots || !HUD->bHasActiveThoraxBounds)
@@ -178,15 +170,26 @@ void FHUDOverlayDrawer::DrawThoraxZoneDots()
     {
         for (int32 Col = 0; Col < N; ++Col)
         {
-            const float CenterU = HUD->ActiveThoraxMinUV.X + (Col + 0.5f) * CellU;
-            const float CenterV = HUD->ActiveThoraxMinUV.Y + (Row + 0.5f) * CellV;
+            const int32 ZoneIdx = Row * N + Col;
+            if (!HUD->ThoraxZones.IsValidIndex(ZoneIdx))
+            {
+                continue;
+            }
+
+            const FThoraxZoneData& Zone = HUD->ThoraxZones[ZoneIdx];
+            if (!Zone.bHasActiveBounds)
+            {
+                continue;
+            }
+
+            const float CenterU = (Zone.ZoneMinUV.X + Zone.ZoneMaxUV.X) * 0.5f;
+            const float CenterV = (Zone.ZoneMinUV.Y + Zone.ZoneMaxUV.Y) * 0.5f;
 
             const FVector2D ScreenPos(CenterU * Width, CenterV * Height);
 
             // Grigio scuro se la zona non ha un valore depth valido.
             FLinearColor DrawColor = HUD->ThoraxZoneDotColor;
-            const int32 ZoneIdx = Row * N + Col;
-            if (HUD->ThoraxZoneDepths.IsValidIndex(ZoneIdx) && HUD->ThoraxZoneDepths[ZoneIdx] < 0.0f)
+            if (Zone.LastDepth < 0.0f)
             {
                 DrawColor = FLinearColor(0.2f, 0.2f, 0.2f, 0.6f);
             }
@@ -210,7 +213,6 @@ void FHUDOverlayDrawer::DrawThoraxZoneDots()
     }
 }
 
-// -----------------------------------------------------------------------
 
 void FHUDOverlayDrawer::DrawJointsOverlay()
 {

@@ -1,8 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "MainPanel.h"
-#include "UDepthGraphWidget.h"
+#include "UI/MainPanel.h"
+#include "Graph/UDepthGraphWidget.h"
 
 
 void UMainPanel::UpdateThoraxDepthGraph(const TArray<float>& History, float LatestDepth, bool bHasDepth)

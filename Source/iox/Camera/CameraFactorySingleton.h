@@ -3,18 +3,16 @@
 #pragma once
 
 #include "UObject/ScriptInterface.h"
-#include "ICameraWithDepth.h"
+#include "Camera/ICameraWithDepth.h"
 
 class IOX_API CameraFactorySingleton
 {
 
 public:
-    /**
-     * Ottiene l'istanza singleton della factory
-     */
+
     static CameraFactorySingleton& GetInstance();
     
-    TScriptInterface<ICameraWithDepth> CreateCamera(const FString& TypeName, UObject* Outer = nullptr);
+    TScriptInterface<ICameraWithDepth> CreateCamera(const FString& TypeName, TObjectPtr<UObject> Outer = nullptr);
 
     bool IsTypeSupported(const FString& TypeName) const;
 
@@ -22,7 +20,6 @@ public:
 
 private:
 
-    // Lista dei tipi supportati
     static const TArray<FString> SupportedCameraTypes;
 
 };

@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "DefaultPoseDetector.h"
+#include "Pose/DefaultPoseDetector.h"
 #include "ImageUtils.h"
 #include "IImageWrapper.h"
 #include "IImageWrapperModule.h"
@@ -10,7 +10,6 @@
 #include "Engine/TextureRenderTarget2D.h"
 
 
-// Sets default values for this object's properties
 UDefaultPoseDetector::UDefaultPoseDetector()
 {
     BodyPoseManager = CreateDefaultSubobject<UBodyPoseManager>(TEXT("BodyPoseManager"));
@@ -50,7 +49,7 @@ void UDefaultPoseDetector::PerformPoseDetectionOnFrame() const
     BodyPoseManager->PerformPoseDetection(RawBytes, Width, Height);
 }
 
-void UDefaultPoseDetector::SetRenderTarget(UTextureRenderTarget2D* InRenderTarget)
+void UDefaultPoseDetector::SetRenderTarget(TObjectPtr<UTextureRenderTarget2D> InRenderTarget)
 {
     RenderTarget = InRenderTarget;
 }

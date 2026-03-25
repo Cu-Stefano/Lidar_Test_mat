@@ -8,16 +8,13 @@
 
 class UUDepthGraphWidget;
 
-/**
- * 
- */
 UCLASS()
 class IOX_API UMainPanel : public UUserWidget
 {
 	GENERATED_BODY()
 
 public:
-    // Variabili che corrispondono ai widget nel designer
+
     UPROPERTY(meta = (BindWidget))
     TObjectPtr<UUDepthGraphWidget> WBPDepthGraph;
     

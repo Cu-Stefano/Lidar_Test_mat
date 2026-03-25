@@ -6,7 +6,7 @@
 #include "UObject/Object.h"
 #include "ARTextures.h"
 #include "BodyPoseManager.h"
-#include "IPoseDetector.h"
+#include "Pose/IPoseDetector.h"
 #include "DefaultPoseDetector.generated.h"
 
 
@@ -22,7 +22,7 @@ public:
     UPROPERTY(BlueprintReadOnly, Category="Pose")
     TObjectPtr<UBodyPoseManager> BodyPoseManager = nullptr;
 
-    virtual void SetRenderTarget(UTextureRenderTarget2D* InRenderTarget) override;
+    virtual void SetRenderTarget(TObjectPtr<UTextureRenderTarget2D> InRenderTarget) override;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Pose")
     TObjectPtr<UTextureRenderTarget2D> RenderTarget = nullptr;

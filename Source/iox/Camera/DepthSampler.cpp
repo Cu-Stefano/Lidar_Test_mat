@@ -1,14 +1,14 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "DepthSampler.h"
+#include "Camera/DepthSampler.h"
 
 #include "Engine/TextureRenderTarget2D.h"
 #include "Kismet/KismetRenderingLibrary.h"
 #include "Materials/MaterialInstanceDynamic.h"
 
 bool UDepthSampler::CaptureFrame(
-    UMaterialInstanceDynamic* DepthMat,
-    UTextureRenderTarget2D* CameraRT,
+    TObjectPtr<UMaterialInstanceDynamic> DepthMat,
+    TObjectPtr<UTextureRenderTarget2D> CameraRT,
     bool bUseFloat32)
 {
     bHasData = false;

@@ -8,7 +8,6 @@
 
 class UTexture;
 
-// This class does not need to be modified.
 UINTERFACE(MinimalAPI)
 class UCameraWithDepth : public UInterface
 {
@@ -22,9 +21,8 @@ class IOX_API ICameraWithDepth
 {
 	GENERATED_BODY()
 
-	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
 
-    virtual UTexture* GetDepthTexture() const = 0;
-    virtual UTexture* GetCameraTexture() const = 0;
+    virtual TObjectPtr<UTexture> GetDepthTexture() const = 0;
+    virtual TObjectPtr<UTexture> GetCameraTexture() const = 0;
 };

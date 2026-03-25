@@ -1,10 +1,9 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "PoseComponentFactorySingleton.h"
-#include "DefaultPoseDetector.h"
+#include "Pose/PoseComponentFactorySingleton.h"
+#include "Pose/DefaultPoseDetector.h"
 
-// Definizione dei tipi supportati
 const TArray<FString> PoseComponentFactorySingleton::SupportedPoseComponentTypes = {
     TEXT("Default"),
 };
@@ -15,7 +14,7 @@ PoseComponentFactorySingleton& PoseComponentFactorySingleton::GetInstance()
     return SingletonInstance;
 }
 
-TScriptInterface<IIPoseDetector> PoseComponentFactorySingleton::CreatePoseComponent(const FString& TypeName, AActor* Owner)
+TScriptInterface<IIPoseDetector> PoseComponentFactorySingleton::CreatePoseComponent(const FString& TypeName, TObjectPtr<AActor> Owner)
 {
     TScriptInterface<IIPoseDetector> Result;
 

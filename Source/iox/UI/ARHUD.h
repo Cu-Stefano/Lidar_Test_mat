@@ -5,12 +5,43 @@
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
 #include "UObject/ScriptInterface.h"
-#include "ICameraWithDepth.h"
-#include "IPoseDetector.h"
-#include "ThoraxJointHelper.h"
-#include "DepthSampler.h"
-#include "HUDOverlayDrawer.h"
+#include "Camera/ICameraWithDepth.h"
+#include "Pose/IPoseDetector.h"
+#include "Utils/Constants.h"
+#include "Camera/DepthSampler.h"
+#include "UI/HUDOverlayDrawer.h"
 #include "ARHUD.generated.h"
+
+enum class EThoraxJointRole : uint8
+{
+    Unknown,
+    Torso,
+    LeftShoulder,
+    RightShoulder,
+    LeftHip,
+    RightHip,
+};
+
+USTRUCT()
+struct FThoraxZoneData
+{
+    GENERATED_BODY()
+
+    UPROPERTY(Transient)
+    FVector2D ZoneMinUV = FVector2D::ZeroVector;
+
+    UPROPERTY(Transient)
+    FVector2D ZoneMaxUV = FVector2D::ZeroVector;
+
+    UPROPERTY(Transient)
+    bool bHasActiveBounds = false;
+
+    UPROPERTY(Transient)
+    float LastDepth = 0.0f;
+
+    UPROPERTY(Transient)
+    TArray<float> DepthHistory;
+};
 
 class UUserWidget;
 class UMainPanel;
@@ -19,9 +50,6 @@ class UMaterialInstanceDynamic;
 class UTextureRenderTarget2D;
 class UFont;
 
-/**
- * 
- */
 UCLASS()
 class IOX_API AARHUD : public AHUD
 {
@@ -170,24 +198,19 @@ protected:
     UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
     bool bUseFloat32DepthSampling = false;
 
-    // Reject depth readings when local sampling quality is poor.
     UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
     bool bUseDepthSampleConfidenceFilter = true;
 
-    // Confidence in [0..1], computed from valid-pixel ratio and local depth stability.
     UPROPERTY(EditAnywhere, Category="Pose|DepthDebug", meta=(ClampMin="0.0", ClampMax="1.0"))
     float MinDepthSampleConfidence = 0.45f;
 
     // ================= Thorax Zone Grid =================
-    // Numero di zone (NxN) in cui suddividere il torace. Configurabile dall'editor.
     UPROPERTY(EditAnywhere, Category="Pose|ThoraxZones", meta=(ClampMin="1", ClampMax="10"))
     int32 NumThoraxZones = 3;
 
-    // Se true, stampa a schermo (UE_LOG) il depth mean di ogni zona ad ogni frame.
     UPROPERTY(EditAnywhere, Category="Pose|ThoraxZones")
     bool bLogThoraxZoneDepths = true;
 
-    // Se true, disegna un puntino al centro di ogni zona del torace.
     UPROPERTY(EditAnywhere, Category="Pose|ThoraxZones")
     bool bDrawThoraxZoneDots = true;
 
@@ -197,9 +220,8 @@ protected:
     UPROPERTY(EditAnywhere, Category="Pose|ThoraxZones")
     float ThoraxZoneDotSize = 8.0f;
 
-    // Risultati dell'ultimo frame: depth mean per ogni cella (riga*NumZones + colonna).
     UPROPERTY(Transient)
-    TArray<float> ThoraxZoneDepths;
+    TArray<FThoraxZoneData> ThoraxZones;
 
     UPROPERTY(Transient)
     FVector2D ActiveThoraxMinUV = FVector2D::ZeroVector;
@@ -276,7 +298,7 @@ protected:
 
 private:
     void ValidateEditorAssignments() const;
-    void PushMaterialToWidget(UMaterialInterface* Material);
+    void PushMaterialToWidget(TObjectPtr<UMaterialInterface> Material);
     void UpdateDepthWidgetState();
     void UpdateMainPanelState();
     void DrawDepthToggleButton();
@@ -301,4 +323,5 @@ private:
         float& OutDepthSampleConfidence
     );
     void ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV);
+    EThoraxJointRole ResolveThoraxJointRole(const FString& RawName) const;
 };

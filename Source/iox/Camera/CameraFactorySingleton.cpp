@@ -1,10 +1,10 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "CameraFactorySingleton.h"
-#include "ARUnrealCamera.h"
-#include "MockCamera.h"
-#include "ICameraWithDepth.h"
+#include "Camera/CameraFactorySingleton.h"
+#include "Camera/ARUnrealCamera.h"
+#include "Camera/MockCamera.h"
+#include "Camera/ICameraWithDepth.h"
 
 // Definizione dei dispositivi supportati
 const TArray<FString> CameraFactorySingleton::SupportedCameraTypes = {
@@ -18,7 +18,7 @@ CameraFactorySingleton& CameraFactorySingleton::GetInstance()
     return SingletonInstance;
 }
 
-TScriptInterface<ICameraWithDepth> CameraFactorySingleton::CreateCamera(const FString& TypeName, UObject* Outer)
+TScriptInterface<ICameraWithDepth> CameraFactorySingleton::CreateCamera(const FString& TypeName, TObjectPtr<UObject> Outer)
 {
     TScriptInterface<ICameraWithDepth> Camera;
     UObject* EffectiveOuter = Outer ? Outer : GetTransientPackage();

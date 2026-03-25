@@ -7,9 +7,6 @@
 #include <CoreFoundation/CFBase.h>
 #include "UDepthGraphWidget.generated.h"
 
-/**
- * 
- */
 UCLASS()
 class IOX_API UUDepthGraphWidget : public UUserWidget
 {

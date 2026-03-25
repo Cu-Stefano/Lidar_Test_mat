@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "ARHUD.h"
+#include "UI/ARHUD.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Blueprint/UserWidget.h"
@@ -11,15 +11,27 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Kismet/KismetRenderingLibrary.h"
-#include "DefaultPoseDetector.h"
+#include "Pose/DefaultPoseDetector.h"
 #include "BodyPoseManager.h"
-#include "CameraFactorySingleton.h"
-#include "PoseComponentFactorySingleton.h"
-#include "ICameraWithDepth.h"
-#include "UDepthGraphWidget.h"
-#include "MainPanel.h"
-#include "Constants.h"
-// Note: Enums, joint dictionaries and helper functions moved to ThoraxJointHelper.h/.cpp
+#include "Camera/CameraFactorySingleton.h"
+#include "Pose/PoseComponentFactorySingleton.h"
+#include "Camera/ICameraWithDepth.h"
+#include "Graph/UDepthGraphWidget.h"
+#include "UI/MainPanel.h"
+#include "Utils/Constants.h"
+
+static const TMap<FString, EThoraxJointRole>& GetThoraxJointRoleDictionary()
+{
+    static const TMap<FString, EThoraxJointRole> Dictionary = {
+        {TEXT("neck_1_joint"),          EThoraxJointRole::Torso},
+        {TEXT("root"),                  EThoraxJointRole::Torso},
+        {TEXT("left_shoulder_1_joint"), EThoraxJointRole::LeftShoulder},
+        {TEXT("right_shoulder_1_joint"),EThoraxJointRole::RightShoulder},
+        {TEXT("left_upleg_joint"),      EThoraxJointRole::LeftHip},
+        {TEXT("right_upleg_joint"),     EThoraxJointRole::RightHip}
+    };
+    return Dictionary;
+}
 
 AARHUD::AARHUD()
 {
@@ -301,6 +313,15 @@ void AARHUD::Tick(float DeltaSeconds)
 
     UpdateMainPanelDepth();
 }
+EThoraxJointRole AARHUD::ResolveThoraxJointRole(const FString& RawName) const
+{
+    const FString NameLower = RawName.ToLower();
+    if (const EThoraxJointRole* Role = GetThoraxJointRoleDictionary().Find(NameLower))
+    {
+        return *Role;
+    }
+    return EThoraxJointRole::Unknown;
+}
 
 void AARHUD::DrawHUD()
 {
@@ -332,8 +353,6 @@ void AARHUD::NotifyHitBoxClick(FName BoxName)
         UpdateDepthWidgetState();
     }
 }
-
-// Methods migrated to HUDOverlayDrawer
 
 bool AARHUD::TryGetThoraxBoundsUV(const TArray<FPoseJoint>& Joints, FVector2D& OutMinUV, FVector2D& OutMaxUV) const
 {
@@ -430,15 +449,12 @@ bool AARHUD::TryGetThoraxBoundsUV(const TArray<FPoseJoint>& Joints, FVector2D& O
 
 bool AARHUD::TryGetSternumBoundsUV(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV, FVector2D& OutMinUV, FVector2D& OutMaxUV, float AreaSize) const
 {
-    // Calcoliamo la larghezza e l'altezza del torace in coordinate UV
     const float ThoraxWidth = ThoraxMaxUV.X - ThoraxMinUV.X;
     const float ThoraxHeight = ThoraxMaxUV.Y - ThoraxMinUV.Y;
 
-    // Troviamo il centro dello sterno (metà delle U e 1/3 delle V dall'alto)
     const float SternumU = ThoraxMinUV.X + (ThoraxWidth * 0.5f);
     const float SternumV = ThoraxMinUV.Y + (ThoraxHeight * 0.5f);
 
-    // Creiamo un'area quadrata attorno allo sterno proporzionale a SternumAreaSize
     const float BoxSize = ThoraxWidth * AreaSize;
     const float HalfBoxSize = BoxSize * 0.5f;
 
@@ -455,14 +471,20 @@ void AARHUD::ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxU
     const int32 N = FMath::Max(1, NumThoraxZones);
     const int32 TotalZones = N * N;
 
-    ThoraxZoneDepths.SetNum(TotalZones);
-    for (float& V : ThoraxZoneDepths) { V = -1.0f; }
+    if (ThoraxZones.Num() != TotalZones)
+    {
+        ThoraxZones.SetNum(TotalZones);
+    }
 
     const float URange = ThoraxMaxUV.X - ThoraxMinUV.X;
     const float VRange = ThoraxMaxUV.Y - ThoraxMinUV.Y;
 
     if (URange <= 0.0f || VRange <= 0.0f)
     {
+        for (FThoraxZoneData& Zone : ThoraxZones)
+        {
+            Zone.bHasActiveBounds = false;
+        }
         return;
     }
 
@@ -473,32 +495,47 @@ void AARHUD::ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxU
     {
         for (int32 Col = 0; Col < N; ++Col)
         {
-            FVector2D ZoneMin, ZoneMax;
-            ZoneMin.X = ThoraxMinUV.X + Col * CellU;
-            ZoneMin.Y = ThoraxMinUV.Y + Row * CellV;
-            ZoneMax.X = ZoneMin.X + CellU;
-            ZoneMax.Y = ZoneMin.Y + CellV;
+            const int32 ZoneIdx = Row * N + Col;
+            FThoraxZoneData& Zone = ThoraxZones[ZoneIdx];
+
+            Zone.ZoneMinUV.X = ThoraxMinUV.X + Col * CellU;
+            Zone.ZoneMinUV.Y = ThoraxMinUV.Y + Row * CellV;
+            Zone.ZoneMaxUV.X = Zone.ZoneMinUV.X + CellU;
+            Zone.ZoneMaxUV.Y = Zone.ZoneMinUV.Y + CellV;
+            Zone.bHasActiveBounds = true;
 
             float ZoneMean = 0.0f;
             int32 ZoneSamples = 0;
             float DummyMin, DummyMax, DummyConf;
-            if (DepthSampler->ComputeMeanInBoundsUV(ZoneMin, ZoneMax, ZoneMean, ZoneSamples, DummyMin, DummyMax, DummyConf))
+            if (DepthSampler->ComputeMeanInBoundsUV(Zone.ZoneMinUV, Zone.ZoneMaxUV, ZoneMean, ZoneSamples, DummyMin, DummyMax, DummyConf))
             {
-                ThoraxZoneDepths[Row * N + Col] = ZoneMean * GameConstants::DEPTH_VALUE_MULTIPLIER;
+                Zone.LastDepth = ZoneMean * GameConstants::DEPTH_VALUE_MULTIPLIER;
+                
+                // Record history
+                Zone.DepthHistory.Add(Zone.LastDepth);
+                const int32 MaxSamples = FMath::Max(1, ThoraxDepthHistoryMaxSamples);
+                if (Zone.DepthHistory.Num() > MaxSamples)
+                {
+                    Zone.DepthHistory.RemoveAt(0, Zone.DepthHistory.Num() - MaxSamples, EAllowShrinking::No);
+                }
+            }
+            else
+            {
+                // Invalidate depth if calculation failed
+                Zone.LastDepth = -1.0f;
             }
         }
     }
 
     if (bLogThoraxZoneDepths)
     {
-        // ---- Costruiamo una stringa con tutti i valori in una sola stampa ----
         FString ZoneLog = FString::Printf(TEXT("[ThoraxZones %dx%d]"), N, N);
         for (int32 Row = 0; Row < N; ++Row)
         {
             ZoneLog += TEXT(" | Row") + FString::FromInt(Row) + TEXT(":");
             for (int32 Col = 0; Col < N; ++Col)
             {
-                const float Val = ThoraxZoneDepths[Row * N + Col];
+                const float Val = ThoraxZones[Row * N + Col].LastDepth;
                 if (Val < 0.0f)
                 {
                     ZoneLog += TEXT(" [--]");
@@ -513,11 +550,7 @@ void AARHUD::ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxU
     }
 }
 
-
-
-// Depth sampling methods migrated to UDepthSampler
-
-void AARHUD::PushMaterialToWidget(UMaterialInterface* Material)
+void AARHUD::PushMaterialToWidget(TObjectPtr<UMaterialInterface> Material)
 {
     if (!SceneDepthWidget || !Material)
     {
@@ -572,8 +605,6 @@ void AARHUD::UpdateMainPanelState()
         bShowMainPanel ? ESlateVisibility::Visible : ESlateVisibility::Collapsed
     );
 }
-
-// Drawing methods migrated to HUDOverlayDrawer
 
 void AARHUD::RecordThoraxDepthSample(const float DepthUnits)
 {

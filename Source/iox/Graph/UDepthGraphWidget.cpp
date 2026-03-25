@@ -1,8 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "UDepthGraphWidget.h"
-#include "GraphMath.h"
+#include "Graph/UDepthGraphWidget.h"
+#include "Graph/GraphMath.h"
 
 #include "Fonts/SlateFontInfo.h"
 #include "Rendering/DrawElements.h"

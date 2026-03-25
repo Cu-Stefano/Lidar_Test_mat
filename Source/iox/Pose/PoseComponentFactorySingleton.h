@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "UObject/ScriptInterface.h"
-#include "IPoseDetector.h"
+#include "Pose/IPoseDetector.h"
 
 class IOX_API PoseComponentFactorySingleton
 {
@@ -13,7 +13,7 @@ public:
 
     static PoseComponentFactorySingleton& GetInstance();
 
-    TScriptInterface<IIPoseDetector> CreatePoseComponent(const FString& TypeName, AActor* Owner = nullptr);
+    TScriptInterface<IIPoseDetector> CreatePoseComponent(const FString& TypeName, TObjectPtr<AActor> Owner = nullptr);
 
     bool IsTypeSupported(const FString& TypeName) const;
 

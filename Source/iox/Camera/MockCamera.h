@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
-#include "ICameraWithDepth.h"
+#include "Camera/ICameraWithDepth.h"
 #include "MockCamera.generated.h"
 
 
@@ -16,10 +16,10 @@ class IOX_API UMockCamera : public UObject, public ICameraWithDepth
 public:	
 	UMockCamera();
 
-	virtual UTexture* GetDepthTexture() const override;
-	virtual UTexture* GetCameraTexture() const override;
+	virtual TObjectPtr<UTexture> GetDepthTexture() const override;
+	virtual TObjectPtr<UTexture> GetCameraTexture() const override;
 
 private:
 	UPROPERTY()
-	class UTexture2D* MockTexture;
+	TObjectPtr<class UTexture2D> MockTexture;
 };

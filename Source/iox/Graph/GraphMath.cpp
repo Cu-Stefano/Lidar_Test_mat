@@ -1,6 +1,6 @@
 
 // GraphMathLibrary.cpp
-#include "GraphMath.h"
+#include "Graph/GraphMath.h"
 
 namespace GraphMath
 {
