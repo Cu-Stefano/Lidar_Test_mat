@@ -200,7 +200,6 @@ protected:
     UPROPERTY(EditAnywhere, Category="Pose|ThoraxZones")
     float ThoraxZoneDotSize = 8.0f;
     
-    UPROPERTY(Transient)
     float LastCalculatedTotalVolume = 0.0f;
 
     float LastVolumeFirstMax = 0.0f;
@@ -208,22 +207,17 @@ protected:
 
     TArray<FThoraxZone> ThoraxZones;
     
-    UPROPERTY(Transient)
     FVector2D ActiveThoraxMinUV = FVector2D::ZeroVector;
 
-    UPROPERTY(Transient)
     FVector2D ActiveThoraxMaxUV = FVector2D::ZeroVector;
 
-    UPROPERTY(Transient)
     bool bHasActiveThoraxBounds = false;
 
     UPROPERTY(Transient)
     TObjectPtr<UDepthSampler> DepthSampler = nullptr;
 
-    UPROPERTY(Transient)
     float LastThoraxDepth = 0.0f;
 
-    UPROPERTY(Transient)
     bool bHasThoraxDepthReading = false;
 
     UPROPERTY(EditAnywhere, Category="UI|DepthGraph", meta=(ClampMin="8", ClampMax="1000"))
@@ -235,10 +229,8 @@ protected:
     UPROPERTY(EditAnywhere, Category="UI|DepthGraph")
     bool bEnableThoraxDepthGraphUpdates = true;
 
-    UPROPERTY(Transient)
     TArray<float> ThoraxDepthHistory;
 
-    UPROPERTY(Transient)
     bool bLoggedMissingDepthGraphFunction = false;
 
     // ================= Sternum Sampling Overlay =================
@@ -261,27 +253,12 @@ protected:
     UPROPERTY(EditAnywhere, Category="UI|Sternum", meta=(ClampMin="0", ClampMax="1"))
     float SternumAreaSize = 0.5f;
 
-    UPROPERTY(Transient)
     FVector2D ActiveSternumMinUV = FVector2D::ZeroVector;
-
-    UPROPERTY(Transient)
     FVector2D ActiveSternumMaxUV = FVector2D::ZeroVector;
-
-    UPROPERTY(Transient)
     bool bHasActiveSternumBounds = false;
-
-    UPROPERTY(Transient)
     float LastSternumDepth = 0.0f;
-
-    UPROPERTY(Transient)
     bool bHasSternumDepthReading = false;
-
-    UPROPERTY(Transient)
     TArray<float> SternumDepthHistory;
-
-    // ================= Zones =================
-  
-
     FHUDOverlayDrawer OverlayDrawer{this};
 
 private:
