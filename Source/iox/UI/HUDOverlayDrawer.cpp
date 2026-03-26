@@ -176,20 +176,16 @@ void FHUDOverlayDrawer::DrawThoraxZoneDots()
                 continue;
             }
 
-            const FThoraxZoneData& Zone = HUD->ThoraxZones[ZoneIdx];
-            if (!Zone.bHasActiveBounds)
-            {
-                continue;
-            }
+            const FThoraxZone& Zone = HUD->ThoraxZones[ZoneIdx];
 
-            const float CenterU = (Zone.ZoneMinUV.X + Zone.ZoneMaxUV.X) * 0.5f;
-            const float CenterV = (Zone.ZoneMinUV.Y + Zone.ZoneMaxUV.Y) * 0.5f;
+            const float CenterU = (Zone.GetZoneMinUV().X + Zone.GetZoneMaxUV().X) * 0.5f;
+            const float CenterV = (Zone.GetZoneMinUV().Y + Zone.GetZoneMaxUV().Y) * 0.5f;
 
             const FVector2D ScreenPos(CenterU * Width, CenterV * Height);
 
             // Grigio scuro se la zona non ha un valore depth valido.
             FLinearColor DrawColor = HUD->ThoraxZoneDotColor;
-            if (Zone.LastDepth < 0.0f)
+            if (Zone.GetLastDepth() < 0.0f)
             {
                 DrawColor = FLinearColor(0.2f, 0.2f, 0.2f, 0.6f);
             }

@@ -25,4 +25,5 @@ public:
 
     virtual TObjectPtr<UTexture> GetDepthTexture() const = 0;
     virtual TObjectPtr<UTexture> GetCameraTexture() const = 0;
+    virtual FVector2D GetCameraFocalLength() const = 0;
 };

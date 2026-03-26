@@ -18,4 +18,5 @@ public:
 
 	virtual TObjectPtr<UTexture> GetDepthTexture() const override;
 	virtual TObjectPtr<UTexture> GetCameraTexture() const override;
+	virtual FVector2D GetCameraFocalLength() const override;
 };

@@ -7,6 +7,7 @@
 #include "MainPanel.generated.h"
 
 class UUDepthGraphWidget;
+class UTextBlock;
 
 UCLASS()
 class IOX_API UMainPanel : public UUserWidget
@@ -26,12 +27,18 @@ public:
     
     UPROPERTY(meta = (BindWidget))
     TObjectPtr<UUDepthGraphWidget> WBPSternumGraph_1;
+    
+    UPROPERTY(meta = (BindWidget))
+    TObjectPtr<UTextBlock> Volume;
 
 	UFUNCTION(BlueprintCallable, Category="UI|MainPanel")
 	void UpdateThoraxDepthGraph(const TArray<float>& History, float LatestDepth, bool bHasDepth);
 
 	UFUNCTION(BlueprintCallable, Category="UI|MainPanel")
 	void UpdateSternumDepthGraph(const TArray<float>& History, float LatestDepth, bool bHasDepth);
+
+    UFUNCTION(BlueprintCallable, Category="UI|MainPanel")
+    void UpdateTotalVolume(float TotalVolume);
 
 
 };

@@ -292,21 +292,21 @@ void AARHUD::Tick(float DeltaSeconds)
     bHasThoraxDepthReading = true;
     RecordThoraxDepthSample(MeanDepthRaw);
 
-    //Sternum
-    float SternumMeanDepthValue = 0.0f;
-    int32 SternumSampleCount = 0;
-    float DummyMin, DummyMax, DummyConf;
+    // //Sternum
+    // float SternumMeanDepthValue = 0.0f;
+    // int32 SternumSampleCount = 0;
+    // float DummyMin, DummyMax, DummyConf;
     
-    if (bHasActiveSternumBounds && DepthSampler->ComputeMeanInBoundsUV(ActiveSternumMinUV, ActiveSternumMaxUV, SternumMeanDepthValue, SternumSampleCount, DummyMin, DummyMax, DummyConf))
-    {
-        LastSternumDepth = SternumMeanDepthValue * GameConstants::DEPTH_VALUE_MULTIPLIER;
-        bHasSternumDepthReading = true;
-        RecordSternumDepthSample(LastSternumDepth);
-    }
-    else
-    {
-        bHasSternumDepthReading = false;
-    }
+    // if (bHasActiveSternumBounds && DepthSampler->ComputeMeanInBoundsUV(ActiveSternumMinUV, ActiveSternumMaxUV, SternumMeanDepthValue, SternumSampleCount, DummyMin, DummyMax, DummyConf))
+    // {
+    //     LastSternumDepth = SternumMeanDepthValue * GameConstants::DEPTH_VALUE_MULTIPLIER;
+    //     bHasSternumDepthReading = true;
+    //     RecordSternumDepthSample(LastSternumDepth);
+    // }
+    // else
+    // {
+    //     bHasSternumDepthReading = false;
+    // }
 
     // Zone grid del torace
     ComputeThoraxZoneDepths(ThoraxMinUV, ThoraxMaxUV);
@@ -481,10 +481,6 @@ void AARHUD::ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxU
 
     if (URange <= 0.0f || VRange <= 0.0f)
     {
-        for (FThoraxZoneData& Zone : ThoraxZones)
-        {
-            Zone.bHasActiveBounds = false;
-        }
         return;
     }
 
@@ -496,58 +492,81 @@ void AARHUD::ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxU
         for (int32 Col = 0; Col < N; ++Col)
         {
             const int32 ZoneIdx = Row * N + Col;
-            FThoraxZoneData& Zone = ThoraxZones[ZoneIdx];
+            FThoraxZone& Zone = ThoraxZones[ZoneIdx];
+            const FVector2D MinUVs = FVector2D(ThoraxMinUV.X + Col * CellU, ThoraxMinUV.Y + Row * CellV);
+            const FVector2D MaxUVs = FVector2D(ThoraxMinUV.X + (Col + 1) * CellU, ThoraxMinUV.Y + (Row + 1) * CellV);
 
-            Zone.ZoneMinUV.X = ThoraxMinUV.X + Col * CellU;
-            Zone.ZoneMinUV.Y = ThoraxMinUV.Y + Row * CellV;
-            Zone.ZoneMaxUV.X = Zone.ZoneMinUV.X + CellU;
-            Zone.ZoneMaxUV.Y = Zone.ZoneMinUV.Y + CellV;
-            Zone.bHasActiveBounds = true;
+            Zone.UpdateBounds(MinUVs, MaxUVs);
 
             float ZoneMean = 0.0f;
             int32 ZoneSamples = 0;
             float DummyMin, DummyMax, DummyConf;
-            if (DepthSampler->ComputeMeanInBoundsUV(Zone.ZoneMinUV, Zone.ZoneMaxUV, ZoneMean, ZoneSamples, DummyMin, DummyMax, DummyConf))
+            if (DepthSampler->ComputeMeanInBoundsUV(MinUVs, MaxUVs, ZoneMean, ZoneSamples, DummyMin, DummyMax, DummyConf))
             {
-                Zone.LastDepth = ZoneMean * GameConstants::DEPTH_VALUE_MULTIPLIER;
-                
-                // Record history
-                Zone.DepthHistory.Add(Zone.LastDepth);
-                const int32 MaxSamples = FMath::Max(1, ThoraxDepthHistoryMaxSamples);
-                if (Zone.DepthHistory.Num() > MaxSamples)
-                {
-                    Zone.DepthHistory.RemoveAt(0, Zone.DepthHistory.Num() - MaxSamples, EAllowShrinking::No);
-                }
+                Zone.AddDepthSample(ZoneMean * GameConstants::DEPTH_VALUE_MULTIPLIER, ThoraxDepthHistoryMaxSamples);
             }
             else
             {
                 // Invalidate depth if calculation failed
-                Zone.LastDepth = -1.0f;
+                Zone.AddDepthSample(-1.0f, ThoraxDepthHistoryMaxSamples);
             }
         }
     }
 
+
     if (bLogThoraxZoneDepths)
     {
-        FString ZoneLog = FString::Printf(TEXT("[ThoraxZones %dx%d]"), N, N);
-        for (int32 Row = 0; Row < N; ++Row)
+        float TotalVolume = 0.0f;
+        if (CalculateThoraxTotalVolume(TotalVolume))
         {
-            ZoneLog += TEXT(" | Row") + FString::FromInt(Row) + TEXT(":");
-            for (int32 Col = 0; Col < N; ++Col)
+            if (MainPanelWidget)
             {
-                const float Val = ThoraxZones[Row * N + Col].LastDepth;
-                if (Val < 0.0f)
-                {
-                    ZoneLog += TEXT(" [--]");
-                }
-                else
-                {
-                    ZoneLog += FString::Printf(TEXT(" [%.3f]"), Val);
-                }
+                MainPanelWidget->UpdateTotalVolume(TotalVolume);
             }
+            UE_LOG(LogTemp, Log, TEXT("[ThoraxZones %dx%d Extrema | Total Volume: %.8f L]"), N, N, TotalVolume / 1000000.0f);
         }
-        UE_LOG(LogTemp, Log, TEXT("%s"), *ZoneLog);
     }
+}
+
+bool AARHUD::CalculateThoraxTotalVolume(float& OutTotalVolume)
+{
+    OutTotalVolume = 0.0f;
+    ICameraWithDepth* Camera = CameraWithDepthProvider.GetInterface();
+    const FVector2D FocalLength = Camera ? Camera->GetCameraFocalLength() : FVector2D(-1.0f, -1.0f);
+    const float ResX = CameraRenderTarget ? static_cast<float>(CameraRenderTarget->SizeX) : 0.0f;
+    const float ResY = CameraRenderTarget ? static_cast<float>(CameraRenderTarget->SizeY) : 0.0f;
+
+    const int32 N = FMath::Max(1, NumThoraxZones);
+    const int32 TotalZones = N * N;
+
+    bool bAnyExtremaChanged = false;
+
+    for (int32 i = 0; i < TotalZones; ++i)
+    {
+        if (!ThoraxZones.IsValidIndex(i)) continue;
+
+        FThoraxZone& Zone = ThoraxZones[i];
+        float Max = 0.0f, Min = 0.0f;
+
+        if (Zone.GetLastMaxMinBreath(Max, Min))
+        {
+            if (i == 0)
+            {
+                if (FMath::Abs(Max - LastVolumeFirstMax) > 0.01f || FMath::Abs(Min - LastVolumeFirstMin) > 0.01f)
+                {
+                    bAnyExtremaChanged = true;
+                    LastVolumeFirstMax = Max;
+                    LastVolumeFirstMin = Min;
+                }
+                else return false; // Indica che e' stato preso lo stessa coppia di max min di prima
+            }
+
+            const FVector2D Res(ResX, ResY);
+            OutTotalVolume += Zone.GetRespirationVolume(FVector2D(FocalLength.X, FocalLength.Y), Res);
+        }
+    }
+
+    return bAnyExtremaChanged;
 }
 
 void AARHUD::PushMaterialToWidget(TObjectPtr<UMaterialInterface> Material)

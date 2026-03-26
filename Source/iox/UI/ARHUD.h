@@ -10,6 +10,7 @@
 #include "Utils/Constants.h"
 #include "Camera/DepthSampler.h"
 #include "UI/HUDOverlayDrawer.h"
+#include "Graph/ThoraxZone.h"
 #include "ARHUD.generated.h"
 
 enum class EThoraxJointRole : uint8
@@ -20,27 +21,6 @@ enum class EThoraxJointRole : uint8
     RightShoulder,
     LeftHip,
     RightHip,
-};
-
-USTRUCT()
-struct FThoraxZoneData
-{
-    GENERATED_BODY()
-
-    UPROPERTY(Transient)
-    FVector2D ZoneMinUV = FVector2D::ZeroVector;
-
-    UPROPERTY(Transient)
-    FVector2D ZoneMaxUV = FVector2D::ZeroVector;
-
-    UPROPERTY(Transient)
-    bool bHasActiveBounds = false;
-
-    UPROPERTY(Transient)
-    float LastDepth = 0.0f;
-
-    UPROPERTY(Transient)
-    TArray<float> DepthHistory;
 };
 
 class UUserWidget;
@@ -219,10 +199,15 @@ protected:
 
     UPROPERTY(EditAnywhere, Category="Pose|ThoraxZones")
     float ThoraxZoneDotSize = 8.0f;
-
+    
     UPROPERTY(Transient)
-    TArray<FThoraxZoneData> ThoraxZones;
+    float LastCalculatedTotalVolume = 0.0f;
 
+    float LastVolumeFirstMax = 0.0f;
+    float LastVolumeFirstMin = 0.0f;
+
+    TArray<FThoraxZone> ThoraxZones;
+    
     UPROPERTY(Transient)
     FVector2D ActiveThoraxMinUV = FVector2D::ZeroVector;
 
@@ -294,6 +279,9 @@ protected:
     UPROPERTY(Transient)
     TArray<float> SternumDepthHistory;
 
+    // ================= Zones =================
+  
+
     FHUDOverlayDrawer OverlayDrawer{this};
 
 private:
@@ -323,5 +311,6 @@ private:
         float& OutDepthSampleConfidence
     );
     void ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV);
+    bool CalculateThoraxTotalVolume(float& OutTotalVolume);
     EThoraxJointRole ResolveThoraxJointRole(const FString& RawName) const;
 };

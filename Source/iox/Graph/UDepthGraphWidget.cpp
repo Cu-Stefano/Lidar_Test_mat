@@ -3,6 +3,7 @@
 
 #include "Graph/UDepthGraphWidget.h"
 #include "Graph/GraphMath.h"
+#include "Graph/GraphUtils.h"
 
 #include "Fonts/SlateFontInfo.h"
 #include "Rendering/DrawElements.h"
@@ -17,18 +18,18 @@ void UUDepthGraphWidget::SetGraphData(const TArray<float>& InDepthHistory, const
 	const float NowSeconds = FPlatformTime::Seconds();
 	{
 		static float LastSetGraphDataLogSeconds = 0.0;
-		if (NowSeconds - LastSetGraphDataLogSeconds > 0.5)
-		{
-			UE_LOG(
-				LogTemp,
-				Log,
-				TEXT("DepthGraphWidget: SetGraphData history=%d current=%.6f hasDepth=%s"),
-				DepthHistory.Num(),
-				CurrentDepth,
-				bHasDepth ? TEXT("true") : TEXT("false")
-			);
-			LastSetGraphDataLogSeconds = NowSeconds;
-		}
+		// if (NowSeconds - LastSetGraphDataLogSeconds > 0.5)
+		// {
+		// 	UE_LOG(
+		// 		LogTemp,
+		// 		Log,
+		// 		TEXT("DepthGraphWidget: SetGraphData history=%d current=%.6f hasDepth=%s"),
+		// 		DepthHistory.Num(),
+		// 		CurrentDepth,
+		// 		bHasDepth ? TEXT("true") : TEXT("false")
+		// 	);
+		// 	LastSetGraphDataLogSeconds = NowSeconds;
+		// }
 	}
 
 	InvalidateLayoutAndVolatility();
@@ -58,36 +59,36 @@ int32 UUDepthGraphWidget::NativePaint(
 	{
 		static float LastNativePaintEntryLogSeconds = 0.0;
 		const float NowSeconds = FPlatformTime::Seconds();
-		if (NowSeconds - LastNativePaintEntryLogSeconds > 1.0)
-		{
-			UE_LOG(
-				LogTemp,
-				Log,
-				TEXT("DepthGraphWidget: NativePaint enter size=(%.1f, %.1f) hasDepth=%s samples=%d"),
-				WidgetSize.X,
-				WidgetSize.Y,
-				bHasDepth ? TEXT("true") : TEXT("false"),
-				DepthHistory.Num()
-			);
-			LastNativePaintEntryLogSeconds = NowSeconds;
-		}
+		// if (NowSeconds - LastNativePaintEntryLogSeconds > 1.0)
+		// {
+		// 	UE_LOG(
+		// 		LogTemp,
+		// 		Log,
+		// 		TEXT("DepthGraphWidget: NativePaint enter size=(%.1f, %.1f) hasDepth=%s samples=%d"),
+		// 		WidgetSize.X,
+		// 		WidgetSize.Y,
+		// 		bHasDepth ? TEXT("true") : TEXT("false"),
+		// 		DepthHistory.Num()
+		// 	);
+		// 	LastNativePaintEntryLogSeconds = NowSeconds;
+		// }
 	}
 
 	if (WidgetSize.X <= 1.0f || WidgetSize.Y <= 1.0f)
 	{
 		static float LastTinySizeLogSeconds = 0.0;
 		const float NowSeconds = FPlatformTime::Seconds();
-		if (NowSeconds - LastTinySizeLogSeconds > 1.0)
-		{
-			UE_LOG(
-				LogTemp,
-				Warning,
-				TEXT("DepthGraphWidget: NativePaint skip tiny size=(%.2f, %.2f)"),
-				WidgetSize.X,
-				WidgetSize.Y
-			);
-			LastTinySizeLogSeconds = NowSeconds;
-		}
+		// if (NowSeconds - LastTinySizeLogSeconds > 1.0)
+		// {
+		// 	UE_LOG(
+		// 		LogTemp,
+		// 		Warning,
+		// 		TEXT("DepthGraphWidget: NativePaint skip tiny size=(%.2f, %.2f)"),
+		// 		WidgetSize.X,
+		// 		WidgetSize.Y
+		// 	);
+		// 	LastTinySizeLogSeconds = NowSeconds;
+		// }
 		return BaseLayer;
 	}
 
@@ -132,17 +133,17 @@ int32 UUDepthGraphWidget::NativePaint(
 	{
 		static float LastNoDataPaintLogSeconds = 0.0;
 		const float NowSeconds = FPlatformTime::Seconds();
-		if (NowSeconds - LastNoDataPaintLogSeconds > 1.0)
-		{
-			UE_LOG(
-				LogTemp,
-				Log,
-				TEXT("DepthGraphWidget: NativePaint skip (hasDepth=%s, samples=%d)"),
-				bHasDepth ? TEXT("true") : TEXT("false"),
-				DepthHistory.Num()
-			);
-			LastNoDataPaintLogSeconds = NowSeconds;
-		}
+		// if (NowSeconds - LastNoDataPaintLogSeconds > 1.0)
+		// {
+		// 	UE_LOG(
+		// 		LogTemp,
+		// 		Log,
+		// 		TEXT("DepthGraphWidget: NativePaint skip (hasDepth=%s, samples=%d)"),
+		// 		bHasDepth ? TEXT("true") : TEXT("false"),
+		// 		DepthHistory.Num()
+		// 	);
+		// 	LastNoDataPaintLogSeconds = NowSeconds;
+		// }
 		return BaseLayer + 2;
 	}
 
@@ -159,23 +160,23 @@ int32 UUDepthGraphWidget::NativePaint(
 	{
 		static float LastSmallPlotLogSeconds = 0.0;
 		const float NowSeconds = FPlatformTime::Seconds();
-		if (NowSeconds - LastSmallPlotLogSeconds > 1.0)
-		{
-			UE_LOG(
-				LogTemp,
-				Warning,
-				TEXT("DepthGraphWidget: NativePaint skip small plot=(%.2f, %.2f) size=(%.2f, %.2f) padding=(L%.1f,T%.1f,R%.1f,B%.1f)"),
-				PlotWidth,
-				PlotHeight,
-				WidgetSize.X,
-				WidgetSize.Y,
-				GraphPadding.Left,
-				GraphPadding.Top,
-				GraphPadding.Right,
-				GraphPadding.Bottom
-			);
-			LastSmallPlotLogSeconds = NowSeconds;
-		}
+		// if (NowSeconds - LastSmallPlotLogSeconds > 1.0)
+		// {
+		// 	UE_LOG(
+		// 		LogTemp,
+		// 		Warning,
+		// 		TEXT("DepthGraphWidget: NativePaint skip small plot=(%.2f, %.2f) size=(%.2f, %.2f) padding=(L%.1f,T%.1f,R%.1f,B%.1f)"),
+		// 		PlotWidth,
+		// 		PlotHeight,
+		// 		WidgetSize.X,
+		// 		WidgetSize.Y,
+		// 		GraphPadding.Left,
+		// 		GraphPadding.Top,
+		// 		GraphPadding.Right,
+		// 		GraphPadding.Bottom
+		// 	);
+		// 	LastSmallPlotLogSeconds = NowSeconds;
+		// }
 		return BaseLayer + 2;
 	}
 
@@ -265,28 +266,26 @@ int32 UUDepthGraphWidget::NativePaint(
 	TArray<FVector2D> GraphPoints;
 	GraphPoints.Reserve(SamplesToDraw);
 
-	TArray<float> SmoothedDepths;
+	TArray<float> SubArray;
+	SubArray.Reserve(SamplesToDraw);
+	for (int32 i = 0; i < SamplesToDraw; ++i)
+	{
+		SubArray.Add(DepthHistory[StartIndex + i]);
+	}
+
+	const float SmoothingAlpha = FMath::Clamp(DepthSmoothingAlpha, 0.01f, 1.0f);
+	if (bEnableDepthSmoothing)
+	{
+		SubArray = GraphUtils::SmoothArray(SubArray, SmoothingAlpha);
+	}
 	TArray<float> ScreenXs;
-	SmoothedDepths.Reserve(SamplesToDraw);
 	ScreenXs.Reserve(SamplesToDraw);
 
 	const float DepthRange = MaxDepth - MinDepth;
-	const float SmoothingAlpha = FMath::Clamp(DepthSmoothingAlpha, 0.01f, 1.0f);
-	float PreviousSmoothedDepth = SamplesToDraw > 0
-		? DepthHistory[StartIndex]
-		: 0.0f;
 
 	for (int32 LocalIndex = 0; LocalIndex < SamplesToDraw; ++LocalIndex)
 	{
-		const float RawSampleValue = DepthHistory[StartIndex + LocalIndex];
-		if (!FMath::IsFinite(RawSampleValue))
-		{
-			continue;
-		}
-		const float SmoothedValue = bEnableDepthSmoothing
-			? FMath::Lerp(PreviousSmoothedDepth, RawSampleValue, SmoothingAlpha)
-			: RawSampleValue;
-		PreviousSmoothedDepth = SmoothedValue;
+		const float SmoothedValue = SubArray[LocalIndex];
 
 		const float AlphaX = SamplesToDraw > 1
 			? static_cast<float>(LocalIndex) / static_cast<float>(SamplesToDraw - 1)
@@ -302,7 +301,6 @@ int32 UUDepthGraphWidget::NativePaint(
 		const FVector2D CurrentPoint(X, Y);
 		GraphPoints.Add(CurrentPoint);
 
-		SmoothedDepths.Add(SmoothedValue);
 		ScreenXs.Add(X);
 	}
 
@@ -318,9 +316,9 @@ int32 UUDepthGraphWidget::NativePaint(
 	);
 
 	// Disegno dei marcatori dei punti minimi e massimi
-	if (SmoothedDepths.Num() >= 3)
+	if (SubArray.Num() >= 3)
 	{
-		TArray<GraphMath::FBreathPoint> Extrema = GraphMath::FindExtrema(ScreenXs, SmoothedDepths, 0.05f, 30);
+		TArray<GraphMath::FBreathPoint> Extrema = GraphMath::FindExtrema(ScreenXs, SubArray, 0.05f, 30);
 		const float ExtremesSize = FMath::Max(5.0f, CurrentPointSize * 1.5f);
 		
 		for (const GraphMath::FBreathPoint& Extreme : Extrema)
@@ -372,19 +370,19 @@ int32 UUDepthGraphWidget::NativePaint(
 
 		static float LastPaintOkLogSeconds = 0.0;
 		const float NowSeconds = FPlatformTime::Seconds();
-		if (NowSeconds - LastPaintOkLogSeconds > 1.0)
-		{
-			UE_LOG(
-				LogTemp,
-				Log,
-				TEXT("DepthGraphWidget: NativePaint drew %d points (min=%.6f, max=%.6f, current=%.6f)"),
-				GraphPoints.Num(),
-				MinDepth,
-				MaxDepth,
-				CurrentDepth
-			);
-			LastPaintOkLogSeconds = NowSeconds;
-		}
+		// if (NowSeconds - LastPaintOkLogSeconds > 1.0)
+		// {
+		// 	UE_LOG(
+		// 		LogTemp,
+		// 		Log,
+		// 		TEXT("DepthGraphWidget: NativePaint drew %d points (min=%.6f, max=%.6f, current=%.6f)"),
+		// 		GraphPoints.Num(),
+		// 		MinDepth,
+		// 		MaxDepth,
+		// 		CurrentDepth
+		// 	);
+		// 	LastPaintOkLogSeconds = NowSeconds;
+		// }
 	}
 
 	return BaseLayer + 4;

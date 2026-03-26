@@ -19,3 +19,13 @@ TObjectPtr<UTexture> UARUnrealCamera::GetCameraTexture() const
 	return UARBlueprintLibrary::GetARTexture(EARTextureType::CameraImage);
 }
 
+FVector2D UARUnrealCamera::GetCameraFocalLength() const
+{	
+	FARCameraIntrinsics Intrinsics;
+	if (UARBlueprintLibrary::GetCameraIntrinsics(Intrinsics))
+	{
+		return Intrinsics.FocalLength;
+	}
+	return FVector2D(-1.0f, .0f);
+}
+
