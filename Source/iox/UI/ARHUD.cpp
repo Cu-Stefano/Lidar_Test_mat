@@ -19,6 +19,7 @@
 #include "Graph/UDepthGraphWidget.h"
 #include "UI/MainPanel.h"
 #include "Utils/Constants.h"
+#include "Graph/GraphTypes.h"
 
 static const TMap<FString, EThoraxJointRole>& GetThoraxJointRoleDictionary()
 {
@@ -228,26 +229,10 @@ void AARHUD::Tick(float DeltaSeconds)
 
     LastThoraxDepth = MeanDepthRaw;
     bHasThoraxDepthReading = true;
-    RecordThoraxDepthSample(MeanDepthRaw);
-
-    // //Sternum
-    // float SternumMeanDepthValue = 0.0f;
-    // int32 SternumSampleCount = 0;
-    // float DummyMin, DummyMax, DummyConf;
-    
-    // if (bHasActiveSternumBounds && DepthSampler->ComputeMeanInBoundsUV(ActiveSternumMinUV, ActiveSternumMaxUV, SternumMeanDepthValue, SternumSampleCount, DummyMin, DummyMax, DummyConf))
-    // {
-    //     LastSternumDepth = SternumMeanDepthValue * GameConstants::DEPTH_VALUE_MULTIPLIER;
-    //     bHasSternumDepthReading = true;
-    //     RecordSternumDepthSample(LastSternumDepth);
-    // }
-    // else
-    // {
-    //     bHasSternumDepthReading = false;
-    // }
-
     // Zone grid del torace
     ComputeThoraxZoneDepths(ThoraxMinUV, ThoraxMaxUV);
+
+    RecordThoraxDepthSample(MeanDepthRaw);
 
     UpdateMainPanelDepth();
 }
@@ -406,6 +391,10 @@ bool AARHUD::TryGetSternumBoundsUV(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV,
 
 void AARHUD::ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV)
 {
+    ICameraWithDepth* Camera = CameraWithDepthProvider.GetInterface();
+    const FVector2D FocalLength = Camera ? Camera->GetCameraFocalLength() : FVector2D(-1.0f, -1.0f);
+    const FVector2D Resolution = CameraRenderTarget ? FVector2D(CameraRenderTarget->SizeX, CameraRenderTarget->SizeY) : FVector2D::ZeroVector;
+
     const int32 N = FMath::Max(1, NumThoraxZones);
     const int32 TotalZones = N * N;
 
@@ -434,7 +423,7 @@ void AARHUD::ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxU
             const FVector2D MinUVs = FVector2D(ThoraxMinUV.X + Col * CellU, ThoraxMinUV.Y + Row * CellV);
             const FVector2D MaxUVs = FVector2D(ThoraxMinUV.X + (Col + 1) * CellU, ThoraxMinUV.Y + (Row + 1) * CellV);
 
-            Zone.UpdateBounds(MinUVs, MaxUVs);
+            Zone.UpdateBounds(MinUVs, MaxUVs, FocalLength, Resolution);
 
             float ZoneMean = 0.0f;
             int32 ZoneSamples = 0;
@@ -500,12 +489,43 @@ bool AARHUD::CalculateThoraxTotalVolume(float& OutTotalVolume)
                 else return false; // Indica che e' stato preso lo stessa coppia di max min di prima
             }
 
-            const FVector2D Res(ResX, ResY);
-            OutTotalVolume += Zone.GetRespirationVolume(FVector2D(FocalLength.X, FocalLength.Y), Res);
+            OutTotalVolume += Zone.GetRespirationVolume();
         }
     }
 
     return bAnyExtremaChanged;
+}
+
+bool AARHUD::CalculateInstantTotalVolume(float& OutTotalVolume)
+{
+    OutTotalVolume = 0.0f;
+    ICameraWithDepth* Camera = CameraWithDepthProvider.GetInterface();
+    if (!Camera) return false;
+
+    const FVector2D FocalLength = Camera->GetCameraFocalLength();
+    const float ResX = CameraRenderTarget ? static_cast<float>(CameraRenderTarget->SizeX) : 0.0f;
+    const float ResY = CameraRenderTarget ? static_cast<float>(CameraRenderTarget->SizeY) : 0.0f;
+
+    if (FocalLength.X <= 0.0f || ResX <= 0.0f) return false;
+
+    for (const FThoraxZone& Zone : ThoraxZones)
+    {
+        const float Depth = Zone.GetLastDepth();
+        if (Depth <= 0.0f) continue;
+
+        const FVector2D MinUV = Zone.GetZoneMinUV();
+        const FVector2D MaxUV = Zone.GetZoneMaxUV();
+        const float UVWidth = FMath::Abs(MaxUV.X - MinUV.X);
+        const float UVHeight = FMath::Abs(MaxUV.Y - MinUV.Y);
+
+        // Volume = Area * Depth
+        // Area = (UVWidth * ResX * Depth / FocalX) * (UVHeight * ResY * Depth / FocalY)
+        const float WidthMM = (UVWidth * ResX * Depth) / FocalLength.X;
+        const float HeightMM = (UVHeight * ResY * Depth) / FocalLength.Y;
+        OutTotalVolume += WidthMM * HeightMM * Depth;
+    }
+
+    return ThoraxZones.Num() > 0;
 }
 
 void AARHUD::PushMaterialToWidget(TObjectPtr<UMaterialInterface> Material)
@@ -564,6 +584,8 @@ void AARHUD::UpdateMainPanelState()
     );
 }
 
+#include "Graph/UDepthGraphWidget.h"
+
 void AARHUD::RecordThoraxDepthSample(const float DepthUnits)
 {
     if (!FMath::IsFinite(DepthUnits))
@@ -600,12 +622,36 @@ void AARHUD::RecordSternumDepthSample(const float DepthUnits)
 
 void AARHUD::UpdateMainPanelDepth()
 {
-    if (!bEnableThoraxDepthGraphUpdates || !MainPanelWidget)
+    if (!bEnableThoraxDepthGraphUpdates || !MainPanelWidget || ThoraxDepthHistory.Num() < 3)
     {
         return;
     }
 
-    MainPanelWidget->UpdateThoraxDepthGraph(ThoraxDepthHistory, LastThoraxDepth, bHasThoraxDepthReading);
+    // 1. Find Extrema on the global average thorax history
+    TArray<float> XValues;
+    XValues.SetNum(ThoraxDepthHistory.Num());
+    for (int32 i = 0; i < XValues.Num(); ++i) XValues[i] = (float)i;
+    
+    // get the first zone extremns to ha ve size reference
+    TArray<GraphExtr::FBreathSection> GlobalExtrema = ThoraxZones[0].GetBreathSections();
+
+    // 2. Map global extrema to a total respirated volume using GraphExtr::FBreathSection from all zones
+    TArray<FGraphLabel> Labels;
+    if(GlobalExtrema.Num() >= 2){
+        // For each global extremum (starting from the second one to have a segment)
+        for (int32 i = 0; i < GlobalExtrema.Num(); ++i)
+        {
+            float TotalSegmentVolume = 0.0f;
+            for (const FThoraxZone& Zone : ThoraxZones)
+            {
+                GraphExtr::FBreathSection Section = Zone.GetBreathSectionAtIndex(i);
+                TotalSegmentVolume += Section.Volume;
+            }
+            
+            Labels.Add(FGraphLabel(GlobalExtrema[i].EndPoint.Index, TotalSegmentVolume, GlobalExtrema[i].EndPoint.bIsPeak));
+        }
+    }
+    MainPanelWidget->UpdateThoraxDepthGraph(ThoraxDepthHistory, Labels, LastThoraxDepth, bHasThoraxDepthReading);
 }
 
 FVector2D AARHUD::ToScreenSpace(float X, float Y) const

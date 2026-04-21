@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Graph/GraphTypes.h"
 #include "UDepthGraphWidget.generated.h"
 
 UCLASS()
@@ -13,9 +14,11 @@ class IOX_API UDepthGraphWidget : public UUserWidget
 
 public:
 	UFUNCTION(BlueprintCallable, Category="Depth Graph")
-	void SetGraphData(const TArray<float>& InDepthHistory, float InCurrentDepth, bool bInHasDepth);
+	void SetGraphData(const TArray<float>& InDepthHistory, const TArray<FGraphLabel>& InLabels, float InCurrentDepth, bool bInHasDepth);
 
 protected:
+	UPROPERTY(BlueprintReadOnly, Category="Depth Graph|Data")
+	TArray<FGraphLabel> VolumeLabels;
 	virtual int32 NativePaint(
 		const FPaintArgs& Args,
 		const FGeometry& AllottedGeometry,
@@ -61,6 +64,12 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis")
 	int32 SamplesForMinMaxCalculation = 200;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis")
+	float VolumeFactor = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis")
+	bool bShowVolumeOnExtrema = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|Smoothing")
 	bool bEnableDepthSmoothing = false;

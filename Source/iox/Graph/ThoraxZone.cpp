@@ -1,10 +1,12 @@
 #include "Graph/ThoraxZone.h"
 #include "Graph/GraphUtils.h"
 
-void FThoraxZone::UpdateBounds(const FVector2D& InMin, const FVector2D& InMax)
+void FThoraxZone::UpdateBounds(const FVector2D& InMin, const FVector2D& InMax, const FVector2D& InFocalLength, const FVector2D& InResolution)
 {
     ZoneMinUV = InMin;
     ZoneMaxUV = InMax;
+    FocalLength = InFocalLength;
+    Resolution = InResolution;
 }
 
 FVector2D FThoraxZone::GetZoneMinUV() const
@@ -64,7 +66,37 @@ TArray<GraphMath::FBreathPoint> FThoraxZone::ComputeExtrema(float SmoothingAlpha
         XValues[i] = static_cast<float>(i); 
     }
 
-    return GraphMath::FindExtrema(XValues, YValues, Prominence, MinDistance);
+    TArray<GraphMath::FBreathPoint> res = GraphMath::FindExtrema(XValues, YValues, Prominence, MinDistance);
+    
+
+    BreathSections.Empty();
+    if (res.Num() < 2) return res;
+
+    for (int32 i = 0; i < res.Num() - 1; ++i)
+    {
+        GraphExtr::FBreathSection Section;
+        Section.StartPoint = res[i];
+        Section.EndPoint = res[i + 1];
+
+        const float MeanDepth = (Section.StartPoint.Y + Section.EndPoint.Y) / 2.0f;
+        const float UVWidth = FMath::Abs(ZoneMaxUV.X - ZoneMinUV.X);
+        const float UVHeight = FMath::Abs(ZoneMaxUV.Y - ZoneMinUV.Y);
+        
+        if (FocalLength.X > 0 && FocalLength.Y > 0 && Resolution.X > 0 && Resolution.Y > 0)
+        {
+            const float WidthMM = (UVWidth * Resolution.X * MeanDepth) / FocalLength.X;
+            const float HeightMM = (UVHeight * Resolution.Y * MeanDepth) / FocalLength.Y;
+            Section.Volume = WidthMM * HeightMM * FMath::Abs(Section.StartPoint.Y - Section.EndPoint.Y);
+        }
+        else
+        {
+            Section.Volume = 0.0f;
+        }
+
+        BreathSections.Add(Section);
+    }
+
+    return res;
 }
 
 bool FThoraxZone::GetLastMaxMinBreath(float& OutMax, float& OutMin) const
@@ -85,7 +117,7 @@ bool FThoraxZone::GetLastMaxMinBreath(float& OutMax, float& OutMin) const
     return true;
 }
 
-float FThoraxZone::GetRespirationVolume(const FVector2D& FocalLength, const FVector2D& Resolution) const
+float FThoraxZone::GetRespirationVolume() const
 {
     float Max = 0.0f;
     float Min = 0.0f;
@@ -96,7 +128,7 @@ float FThoraxZone::GetRespirationVolume(const FVector2D& FocalLength, const FVec
 
     float WidthMM = 0.0f;
     float HeightMM = 0.0f;
-    if (!GetZoneDimensionsMM(FocalLength, Resolution, WidthMM, HeightMM))
+    if (!GetZoneDimensionsMM(WidthMM, HeightMM))
     {
         return 0.0f;
     }
@@ -105,7 +137,7 @@ float FThoraxZone::GetRespirationVolume(const FVector2D& FocalLength, const FVec
     return WidthMM * HeightMM * FMath::Abs(Max - Min);
 }
 
-bool FThoraxZone::GetZoneDimensionsMM(const FVector2D& FocalLength, const FVector2D& Resolution, float& OutWidthMM, float& OutHeightMM) const
+bool FThoraxZone::GetZoneDimensionsMM(float& OutWidthMM, float& OutHeightMM) const
 {
     if (FocalLength.X <= 0.0f || FocalLength.Y <= 0.0f || Resolution.X <= 0.0f || Resolution.Y <= 0.0f)
     {
@@ -127,4 +159,18 @@ bool FThoraxZone::GetZoneDimensionsMM(const FVector2D& FocalLength, const FVecto
     OutHeightMM = (UVHeight * Resolution.Y * MeanDepth) / FocalLength.Y;
 
     return true;
+}
+
+GraphExtr::FBreathSection FThoraxZone::GetBreathSectionAtIndex(const int32 Index) const
+{
+    if (BreathSections.IsValidIndex(Index))
+    {
+        return BreathSections[Index];
+    }
+    return GraphExtr::FBreathSection();
+}
+
+TArray<GraphExtr::FBreathSection> FThoraxZone::GetBreathSections() const
+{
+    return BreathSections;
 }

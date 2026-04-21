@@ -9,9 +9,10 @@
 #include "Rendering/DrawElements.h"
 #include "Styling/CoreStyle.h"
 
-void UDepthGraphWidget::SetGraphData(const TArray<float>& InDepthHistory, const float InCurrentDepth, const bool bInHasDepth)
+void UDepthGraphWidget::SetGraphData(const TArray<float>& InDepthHistory, const TArray<FGraphLabel>& InLabels, const float InCurrentDepth, const bool bInHasDepth)
 {
 	DepthHistory = InDepthHistory;
+	VolumeLabels = InLabels;
 	CurrentDepth = InCurrentDepth;
 	bHasDepth = bInHasDepth;
 
@@ -326,9 +327,12 @@ int32 UDepthGraphWidget::NativePaint(
 	{
 		TArray<GraphMath::FBreathPoint> Extrema = GraphMath::FindExtrema(ScreenXs, SubArray, 0.05f, 30);
 		const float ExtremesSize = FMath::Max(5.0f, CurrentPointSize * 1.5f);
+		const FSlateFontInfo VolumeFont = FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 10);
+		const FLinearColor TextColor = FLinearColor::White;
 		
-		for (const GraphMath::FBreathPoint& Extreme : Extrema)
+		for (int32 i = 0; i < Extrema.Num(); ++i)
 		{
+			const GraphMath::FBreathPoint& Extreme = Extrema[i];
 			if (Extreme.Index >= 0 && Extreme.Index < GraphPoints.Num())
 			{
 				const FVector2D& ExtremePoint = GraphPoints[Extreme.Index];
@@ -348,6 +352,44 @@ int32 UDepthGraphWidget::NativePaint(
 					ESlateDrawEffect::None,
 					MarkerColor
 				);
+
+				// Disegna la label per il segmento che termina al prossimo estremo (i+1)
+				if (bShowVolumeOnExtrema && i + 1 < Extrema.Num() && i < VolumeLabels.Num())
+				{
+					const FGraphLabel& Label = VolumeLabels[i];
+					const GraphMath::FBreathPoint& NextExtreme = Extrema[i + 1];
+
+					if (NextExtreme.Index >= 0 && NextExtreme.Index < GraphPoints.Num())
+					{
+						const FVector2D& LabelPoint = GraphPoints[NextExtreme.Index];
+						const float DeltaVolume = Label.Value / 1000000.0f; // mm3 to L
+						FString VolumeStr = FString::Printf(TEXT("%.2f L"), DeltaVolume);
+						
+						// Position: Above Green, Below Red
+						FVector2f TextOffset;
+						if (Label.bIsPeak)
+						{
+							TextOffset = FVector2f(-20.0f, -22.0f);
+						}
+						else
+						{
+							TextOffset = FVector2f(-20.0f, 15.0f);
+						}
+
+						FSlateDrawElement::MakeText(
+							OutDrawElements,
+							BaseLayer + 6,
+							AllottedGeometry.ToPaintGeometry(
+								FVector2f(100.0f, 20.0f),
+								FSlateLayoutTransform(FVector2f(static_cast<float>(LabelPoint.X), static_cast<float>(LabelPoint.Y)) + TextOffset)
+							),
+							VolumeStr,
+							VolumeFont,
+							ESlateDrawEffect::None,
+							TextColor
+						);
+					}
+				}
 			}
 		}
 	}

@@ -231,7 +231,7 @@ protected:
 
     TArray<float> ThoraxDepthHistory;
 
-    bool bLoggedMissingDepthGraphFunction = false;
+    bool CalculateInstantTotalVolume(float& OutTotalVolume);
 
     // ================= Sternum Sampling Overlay =================
     UPROPERTY(EditAnywhere, Category="Overlay|Sternum")

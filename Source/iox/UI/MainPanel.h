@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Graph/UDepthGraphWidget.h"
+#include "Graph/GraphTypes.h"
 #include "MainPanel.generated.h"
 
 class UDepthGraphWidget;
@@ -23,7 +25,7 @@ public:
     TObjectPtr<UTextBlock> Volume;
 
 	UFUNCTION(BlueprintCallable, Category="UI|MainPanel")
-	void UpdateThoraxDepthGraph(const TArray<float>& History, float LatestDepth, bool bHasDepth);
+	void UpdateThoraxDepthGraph(const TArray<float>& History, const TArray<FGraphLabel>& Labels, float LatestDepth, bool bHasDepth);
 
     UFUNCTION(BlueprintCallable, Category="UI|MainPanel")
     void UpdateTotalVolume(float TotalVolume);
