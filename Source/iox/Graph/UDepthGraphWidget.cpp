@@ -264,9 +264,9 @@ int32 UDepthGraphWidget::NativePaint(
 		);
 	};
 
-	DrawYAxisLabel(BaseLayer + 3, Top, MaxDepth);
+	DrawYAxisLabel(BaseLayer + 3, Top, MinDepth);
 	DrawYAxisLabel(BaseLayer + 3, Top + 0.5f * PlotHeight, MidDepth);
-	DrawYAxisLabel(BaseLayer + 3, Bottom, MinDepth);
+	DrawYAxisLabel(BaseLayer + 3, Bottom, MaxDepth);
 
 	TArray<FVector2D> GraphPoints;
 	GraphPoints.Reserve(SamplesToDraw);
@@ -302,7 +302,8 @@ int32 UDepthGraphWidget::NativePaint(
 		);
 
 		const float X = Left + AlphaX * PlotWidth;
-		const float Y = Bottom - NormalizedDepth * PlotHeight;
+		// Invert Y mapping: MinDepth (closer) at Top, MaxDepth (farther) at Bottom
+		const float Y = Top + NormalizedDepth * PlotHeight;
 		const FVector2D CurrentPoint(X, Y);
 		GraphPoints.Add(CurrentPoint);
 
