@@ -606,7 +606,6 @@ void AARHUD::UpdateMainPanelDepth()
     }
 
     MainPanelWidget->UpdateThoraxDepthGraph(ThoraxDepthHistory, LastThoraxDepth, bHasThoraxDepthReading);
-    MainPanelWidget->UpdateSternumDepthGraph(SternumDepthHistory, LastSternumDepth, bHasSternumDepthReading);
 }
 
 FVector2D AARHUD::ToScreenSpace(float X, float Y) const

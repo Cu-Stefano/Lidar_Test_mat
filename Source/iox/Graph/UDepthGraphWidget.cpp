@@ -9,7 +9,7 @@
 #include "Rendering/DrawElements.h"
 #include "Styling/CoreStyle.h"
 
-void UUDepthGraphWidget::SetGraphData(const TArray<float>& InDepthHistory, const float InCurrentDepth, const bool bInHasDepth)
+void UDepthGraphWidget::SetGraphData(const TArray<float>& InDepthHistory, const float InCurrentDepth, const bool bInHasDepth)
 {
 	DepthHistory = InDepthHistory;
 	CurrentDepth = InCurrentDepth;
@@ -35,7 +35,7 @@ void UUDepthGraphWidget::SetGraphData(const TArray<float>& InDepthHistory, const
 	InvalidateLayoutAndVolatility();
 }
 
-int32 UUDepthGraphWidget::NativePaint(
+int32 UDepthGraphWidget::NativePaint(
 	const FPaintArgs& Args,
 	const FGeometry& AllottedGeometry,
 	const FSlateRect& MyCullingRect,
@@ -185,11 +185,16 @@ int32 UUDepthGraphWidget::NativePaint(
 	const int32 SamplesToDraw = FMath::Min(TotalSamples, MaxSamples);
 	const int32 StartIndex = TotalSamples - SamplesToDraw;
 
-	// scale graph based on Max e Min value
+	// scale graph based on Max e Min value in a specific window of recent History
 	float MinDepth = TNumericLimits<float>::Max();
 	float MaxDepth = TNumericLimits<float>::Lowest();
 	int32 ValidSamples = 0;
-	for (int32 SampleIndex = StartIndex; SampleIndex < TotalSamples; ++SampleIndex)
+
+	// Use only the most recent N samples to determine the scaling range
+	const int32 CalculationWindow = FMath::Clamp(SamplesForMinMaxCalculation, 2, TotalSamples);
+	const int32 CalculationStartIndex = TotalSamples - CalculationWindow;
+
+	for (int32 SampleIndex = CalculationStartIndex; SampleIndex < TotalSamples; ++SampleIndex)
 	{
 		const float Value = DepthHistory[SampleIndex];
 		if (!FMath::IsFinite(Value))
@@ -203,15 +208,15 @@ int32 UUDepthGraphWidget::NativePaint(
 
 	if (ValidSamples < 2)
 	{
-		return BaseLayer + 2;
+		// Fallback to clamp ranges if no valid samples
+		MinDepth = MinYAxisClamp;
+		MaxDepth = MaxYAxisClamp;
 	}
-
-	// add padding to top and bottom (max Y e min Y) of graph
-	MinDepth = FMath::Max(0.0f, MinDepth - FixedYRangePadding);
-	MaxDepth = MaxDepth + FixedYRangePadding;
-	if (MinDepth == MaxDepth)
+	else
 	{
-		MaxDepth = MinDepth + 1;
+		// Add padding and apply absolute clamps
+		MinDepth = FMath::Max(MinYAxisClamp, MinDepth - FixedYRangePadding);
+		MaxDepth = FMath::Min(MaxYAxisClamp, MaxDepth + FixedYRangePadding);
 	}
 
 	const float MidDepth = 0.5f * (MinDepth + MaxDepth);

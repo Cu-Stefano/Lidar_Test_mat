@@ -4,11 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include <CoreFoundation/CFBase.h>
 #include "UDepthGraphWidget.generated.h"
 
 UCLASS()
-class IOX_API UUDepthGraphWidget : public UUserWidget
+class IOX_API UDepthGraphWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
@@ -51,8 +50,17 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Depth Graph|Style", meta=(ClampMin="16", ClampMax="2000"))
 	int32 MaxHistorySamples = 500;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis", meta=(ClampMin="0", ClampMax="5000", UIMin="0", UIMax="20000"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis")
+	float MinYAxisClamp = 1000.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis")
+	float MaxYAxisClamp = 2000.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis")
 	float FixedYRangePadding = 10.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis")
+	int32 SamplesForMinMaxCalculation = 200;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|Smoothing")
 	bool bEnableDepthSmoothing = false;
