@@ -172,11 +172,7 @@ bool UDepthSampler::ComputeMeanInBoundsUV(
                 {
                     PixelConfidence = RawConf;
                 }
-                
-                if(PixelConfidence == 0.5f)
-                    UE_LOG(LogTemp, Warning, TEXT("RawConf: %f"), RawConf);
             }
-            
             
             if (!FMath::IsFinite(PixelDepth) || PixelConfidence < MinConfidence)
             {
