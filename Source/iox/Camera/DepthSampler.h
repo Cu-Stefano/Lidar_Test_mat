@@ -15,8 +15,9 @@ class IOX_API UDepthSampler : public UObject
     GENERATED_BODY()
 
 public:
-    bool CaptureFrame(
+    bool CaptureFrame( 
         TObjectPtr<UMaterialInstanceDynamic> DepthMat,
+        TObjectPtr<UTexture> ConfidenceTexture,
         TObjectPtr<UTextureRenderTarget2D> CameraRT,
         bool bUseFloat32);
 
@@ -27,16 +28,24 @@ public:
         int32& OutSampleCount,
         float& OutMinDepthValue,
         float& OutMaxDepthValue,
-        float& OutDepthSampleConfidence) const;
+        float& OutDepthSampleConfidence,
+        float MinConfidence = 0.0f) const;
 
 private:
     UPROPERTY(Transient)
     TObjectPtr<UTextureRenderTarget2D> DebugRenderTarget = nullptr;
 
     UPROPERTY(Transient)
+    TObjectPtr<UTextureRenderTarget2D> ConfidenceRenderTarget = nullptr;
+
+    UPROPERTY(Transient)
     TArray<FLinearColor> FramePixels;
+
+    UPROPERTY(Transient)
+    TArray<FLinearColor> ConfidencePixels;
 
     int32 RTWidth = 0;
     int32 RTHeight = 0;
     bool bHasData = false;
+    bool bHasConfidenceData = false;
 };

@@ -41,7 +41,6 @@ AARHUD::AARHUD()
 void AARHUD::BeginPlay()
 {
     Super::BeginPlay();
-    ValidateEditorAssignments();
 
     // Pose Component 
     PoseComponentFactorySingleton& PoseFactory = PoseComponentFactorySingleton::GetInstance();
@@ -101,72 +100,6 @@ void AARHUD::BeginPlay()
     DepthSampler = NewObject<UDepthSampler>(this);
 }
 
-void AARHUD::ValidateEditorAssignments() const
-{
-    if (!DepthWidgetClass)
-    {
-        UE_LOG(
-            LogTemp,
-            Warning,
-            TEXT("AARHUD: DepthWidgetClass is null. Assign a widget (e.g. UI_DepthShower) in HUD class defaults.")
-        );
-    }
-
-    if (!DepthMaterialBase)
-    {
-        UE_LOG(
-            LogTemp,
-            Warning,
-            TEXT("AARHUD: DepthMaterialBase is null. Assign MT_DepthMaterial in HUD class defaults.")
-        );
-    }
-
-    if (!CameraMaterialBase)
-    {
-        UE_LOG(
-            LogTemp,
-            Warning,
-            TEXT("AARHUD: CameraMaterialBase is null. Assign MT_Camera in HUD class defaults.")
-        );
-    }
-
-    if (!CameraRenderTarget)
-    {
-        UE_LOG(
-            LogTemp,
-            Warning,
-            TEXT("AARHUD: CameraRenderTarget is null. Assign RT_Camera in HUD class defaults.")
-        );
-    }
-
-    if (!DepthRenderTarget)
-    {
-        UE_LOG(
-            LogTemp,
-            Warning,
-            TEXT("AARHUD: DepthRenderTarget is null. Assign RT_Depth in HUD class defaults.")
-        );
-    }
-
-    if (!MainPanelClass)
-    {
-        UE_LOG(
-            LogTemp,
-            Warning,
-            TEXT("AARHUD: MainPanelClass is null. Depth graph panel updates will not be visible.")
-        );
-    }
-
-    if (!ChestAreaMaterial)
-    {
-        UE_LOG(
-            LogTemp,
-            Warning,
-            TEXT("AARHUD: ChestAreaMaterial is null. Chest box will use fallback color only.")
-        );
-    }
-}
-
 void AARHUD::GetThoraxDepthHistory(TArray<float>& OutHistory, float& OutLatestDepth, bool& bOutHasDepth) const
 {
     OutHistory = ThoraxDepthHistory;
@@ -189,14 +122,17 @@ void AARHUD::Tick(float DeltaSeconds)
 
     if (DepthMaterial && CameraWithDepth)
     {
-            if (UTexture* DepthTexture = CameraWithDepth->GetDepthTexture())
+        if (UTexture* DepthTexture = CameraWithDepth->GetDepthTexture())
+        {
+            DepthMaterial->SetTextureParameterValue(DepthTextureParameterName, DepthTexture);
+
+            if (bShowDepthOverlay)
             {
-                DepthMaterial->SetTextureParameterValue(DepthTextureParameterName, DepthTexture);
-                if (bShowDepthOverlay)
-                {
-                    UpdateDepthWidgetState();
-                }
+                UpdateDepthWidgetState();
             }
+        }
+
+        
     }
 
         if (CameraMaterial && CameraWithDepth)
@@ -253,7 +189,8 @@ void AARHUD::Tick(float DeltaSeconds)
 
     bHasActiveThoraxBounds = true;
 
-    if (!DepthSampler || !DepthSampler->CaptureFrame(DepthMaterial, CameraRenderTarget, bUseFloat32DepthSampling))
+    TObjectPtr<UTexture> ConfidenceTexture = CameraWithDepth ? CameraWithDepth->GetConfidenceTexture() : nullptr;
+    if (!DepthSampler || !DepthSampler->CaptureFrame(DepthMaterial, ConfidenceTexture, CameraRenderTarget, bUseFloat32DepthSampling))
     {
         bHasThoraxDepthReading = false;
         bHasSternumDepthReading = false;
@@ -269,8 +206,9 @@ void AARHUD::Tick(float DeltaSeconds)
     float DepthSampleConfidence = 0.0f;
     int32 SampleCount = 0;
 
-    //Thoarx
-    if (!DepthSampler->ComputeMeanInBoundsUV(ThoraxMinUV, ThoraxMaxUV, MeanDepthValue, SampleCount, MinDepthValue, MaxDepthValue, DepthSampleConfidence))
+    //Thorax
+    const float SamplingMinConfidence = bUseDepthSampleConfidenceFilter ? MinDepthSampleConfidence : 0.0f;
+    if (!DepthSampler->ComputeMeanInBoundsUV(ThoraxMinUV, ThoraxMaxUV, MeanDepthValue, SampleCount, MinDepthValue, MaxDepthValue, DepthSampleConfidence, SamplingMinConfidence))
     {
         bHasThoraxDepthReading = false;
         bHasActiveThoraxBounds = false;
@@ -490,7 +428,7 @@ void AARHUD::ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxU
     for (int32 Row = 0; Row < N; ++Row)
     {
         for (int32 Col = 0; Col < N; ++Col)
-        {
+        { 
             const int32 ZoneIdx = Row * N + Col;
             FThoraxZone& Zone = ThoraxZones[ZoneIdx];
             const FVector2D MinUVs = FVector2D(ThoraxMinUV.X + Col * CellU, ThoraxMinUV.Y + Row * CellV);
@@ -501,7 +439,8 @@ void AARHUD::ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxU
             float ZoneMean = 0.0f;
             int32 ZoneSamples = 0;
             float DummyMin, DummyMax, DummyConf;
-            if (DepthSampler->ComputeMeanInBoundsUV(MinUVs, MaxUVs, ZoneMean, ZoneSamples, DummyMin, DummyMax, DummyConf))
+            const float SamplingMinConfidence = bUseDepthSampleConfidenceFilter ? MinDepthSampleConfidence : 0.0f;
+            if (DepthSampler->ComputeMeanInBoundsUV(MinUVs, MaxUVs, ZoneMean, ZoneSamples, DummyMin, DummyMax, DummyConf, SamplingMinConfidence))
             {
                 Zone.AddDepthSample(ZoneMean * GameConstants::DEPTH_VALUE_MULTIPLIER, ThoraxDepthHistoryMaxSamples);
             }

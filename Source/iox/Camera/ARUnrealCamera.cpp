@@ -19,6 +19,11 @@ TObjectPtr<UTexture> UARUnrealCamera::GetCameraTexture() const
 	return UARBlueprintLibrary::GetARTexture(EARTextureType::CameraImage);
 }
 
+TObjectPtr<UTexture> UARUnrealCamera::GetConfidenceTexture() const
+{
+	return UARBlueprintLibrary::GetARTexture(EARTextureType::SceneDepthConfidenceMap);
+}
+
 FVector2D UARUnrealCamera::GetCameraFocalLength() const
 {	
 	FARCameraIntrinsics Intrinsics;

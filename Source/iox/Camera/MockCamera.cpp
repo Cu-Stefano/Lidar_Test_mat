@@ -25,6 +25,11 @@ TObjectPtr<UTexture> UMockCamera::GetCameraTexture() const
 	return MockTexture;
 }
 
+TObjectPtr<UTexture> UMockCamera::GetConfidenceTexture() const
+{
+	return MockTexture;
+}
+
 FVector2D UMockCamera::GetCameraFocalLength() const
 {
 	return FVector2D(1000.0f, 1000.0f);
