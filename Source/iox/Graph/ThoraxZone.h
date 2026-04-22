@@ -33,6 +33,7 @@ public:
     bool GetLastMaxMinBreath(float& OutMax, float& OutMin) const;
     
     float GetRespirationVolume() const;
+    float GetVolumeBetweenIndexes(int32 StartIndex, int32 EndIndex) const;
     bool GetZoneDimensionsMM(float& OutWidthMM, float& OutHeightMM) const;
     
     GraphExtr::FBreathSection GetBreathSectionAtIndex(const int32 Index) const;

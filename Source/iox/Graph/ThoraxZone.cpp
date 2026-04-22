@@ -78,7 +78,14 @@ TArray<GraphMath::FBreathPoint> FThoraxZone::ComputeExtrema(float SmoothingAlpha
         Section.StartPoint = res[i];
         Section.EndPoint = res[i + 1];
 
-        const float MeanDepth = (Section.StartPoint.Y + Section.EndPoint.Y) / 2.0f;
+        const bool bHasValidDepthPair = DepthHistory.IsValidIndex(Section.StartPoint.Index) && DepthHistory.IsValidIndex(Section.EndPoint.Index);
+        const float StartDepth = bHasValidDepthPair ? DepthHistory[Section.StartPoint.Index] : 0.0f;
+        const float EndDepth = bHasValidDepthPair ? DepthHistory[Section.EndPoint.Index] : 0.0f;
+
+        const float MeanDepth = bHasValidDepthPair
+            ? (StartDepth + EndDepth) / 2.0f
+            : 0.0f;
+            
         const float UVWidth = FMath::Abs(ZoneMaxUV.X - ZoneMinUV.X);
         const float UVHeight = FMath::Abs(ZoneMaxUV.Y - ZoneMinUV.Y);
         
@@ -86,7 +93,8 @@ TArray<GraphMath::FBreathPoint> FThoraxZone::ComputeExtrema(float SmoothingAlpha
         {
             const float WidthMM = (UVWidth * Resolution.X * MeanDepth) / FocalLength.X;
             const float HeightMM = (UVHeight * Resolution.Y * MeanDepth) / FocalLength.Y;
-            Section.Volume = WidthMM * HeightMM * FMath::Abs(Section.StartPoint.Y - Section.EndPoint.Y);
+            const float DepthDelta = bHasValidDepthPair ? FMath::Abs(StartDepth - EndDepth) : 0.0f;
+            Section.Volume = WidthMM * HeightMM * DepthDelta;
         }
         else
         {
@@ -109,8 +117,17 @@ bool FThoraxZone::GetLastMaxMinBreath(float& OutMax, float& OutMin) const
         return false;
     }
     
-    const float FirstValue = Extrema[Extrema.Num() - 3].Y;
-    const float SecondValue = Extrema[Extrema.Num() - 2].Y;
+    const int32 FirstIndex = Extrema[Extrema.Num() - 3].Index;
+    const int32 SecondIndex = Extrema[Extrema.Num() - 2].Index;
+    if (!DepthHistory.IsValidIndex(FirstIndex) || !DepthHistory.IsValidIndex(SecondIndex))
+    {
+        OutMax = 0.0f;
+        OutMin = 0.0f;
+        return false;
+    }
+
+    const float FirstValue = DepthHistory[FirstIndex];
+    const float SecondValue = DepthHistory[SecondIndex];
     
     OutMax = FMath::Max(FirstValue, SecondValue);
     OutMin = FMath::Min(FirstValue, SecondValue);
@@ -135,6 +152,35 @@ float FThoraxZone::GetRespirationVolume() const
 
     // Breath Volume is Width * Height * DepthDifference
     return WidthMM * HeightMM * FMath::Abs(Max - Min);
+}
+
+float FThoraxZone::GetVolumeBetweenIndexes(int32 StartIndex, int32 EndIndex) const
+{
+    if (!DepthHistory.IsValidIndex(StartIndex) || !DepthHistory.IsValidIndex(EndIndex))
+    {
+        return 0.0f;
+    }
+
+    const float StartDepth = DepthHistory[StartIndex];
+    const float EndDepth = DepthHistory[EndIndex];
+    if (!FMath::IsFinite(StartDepth) || !FMath::IsFinite(EndDepth) || StartDepth <= 0.0f || EndDepth <= 0.0f)
+    {
+        return 0.0f;
+    }
+
+    if (FocalLength.X <= 0.0f || FocalLength.Y <= 0.0f || Resolution.X <= 0.0f || Resolution.Y <= 0.0f)
+    {
+        return 0.0f;
+    }
+
+    const float MeanDepth = 0.5f * (StartDepth + EndDepth);
+    const float UVWidth = FMath::Abs(ZoneMaxUV.X - ZoneMinUV.X);
+    const float UVHeight = FMath::Abs(ZoneMaxUV.Y - ZoneMinUV.Y);
+    const float WidthMM = (UVWidth * Resolution.X * MeanDepth) / FocalLength.X;
+    const float HeightMM = (UVHeight * Resolution.Y * MeanDepth) / FocalLength.Y;
+    const float DepthDelta = FMath::Abs(EndDepth - StartDepth);
+
+    return WidthMM * HeightMM * DepthDelta;
 }
 
 bool FThoraxZone::GetZoneDimensionsMM(float& OutWidthMM, float& OutHeightMM) const
@@ -174,3 +220,4 @@ TArray<GraphExtr::FBreathSection> FThoraxZone::GetBreathSections() const
 {
     return BreathSections;
 }
+

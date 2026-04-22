@@ -9,10 +9,10 @@
 #include "Rendering/DrawElements.h"
 #include "Styling/CoreStyle.h"
 
-void UDepthGraphWidget::SetGraphData(const TArray<float>& InDepthHistory, const TArray<FGraphLabel>& InLabels, const float InCurrentDepth, const bool bInHasDepth)
+void UDepthGraphWidget::SetGraphData(const TArray<float>& InDepthHistory, const TArray<float>& TotalVolumes, const float InCurrentDepth, const bool bInHasDepth)
 {
 	DepthHistory = InDepthHistory;
-	VolumeLabels = InLabels;
+	VolumeLabels = TotalVolumes;
 	CurrentDepth = InCurrentDepth;
 	bHasDepth = bInHasDepth;
 
@@ -326,10 +326,72 @@ int32 UDepthGraphWidget::NativePaint(
 	if (SubArray.Num() >= 3)
 	{
 		TArray<GraphMath::FBreathPoint> Extrema = GraphMath::FindExtrema(ScreenXs, SubArray, 0.05f, 30);
+
+		const int32 HistoryLimit = FMath::Max(1, MaxExtremaHistory);
+		for (int32 ExtremaIndex = 0; ExtremaIndex < Extrema.Num(); ++ExtremaIndex)
+		{
+			const GraphMath::FBreathPoint& Extreme = Extrema[ExtremaIndex];
+			const int32 SampleIndex = StartIndex + Extreme.Index;
+			if (!DepthHistory.IsValidIndex(SampleIndex))
+			{
+				continue;
+			}
+
+			FDepthGraphExtremaSample Snapshot;
+			Snapshot.SampleIndex = SampleIndex;
+			Snapshot.Depth = DepthHistory[SampleIndex];
+			Snapshot.bIsPeak = Extreme.bIsPeak;
+			Snapshot.MarkerColor = Extreme.bIsPeak ? FLinearColor::Green : FLinearColor::Red;
+
+			if (ExtremaHistory.Num() == 0)
+			{
+				ExtremaHistory.Add(Snapshot);
+				continue;
+			}
+
+			FDepthGraphExtremaSample& LastSample = ExtremaHistory.Last();
+			if (LastSample.bIsPeak == Snapshot.bIsPeak)
+			{
+				if (Snapshot.SampleIndex >= LastSample.SampleIndex)
+				{
+					// Keep only the most recent extremum "live" while the graph grows.
+					LastSample = Snapshot;
+				}
+			}
+			else if (Snapshot.SampleIndex > LastSample.SampleIndex)
+			{
+				ExtremaHistory.Add(Snapshot);
+			}
+		}
+
+		if (ExtremaHistory.Num() > HistoryLimit)
+		{
+			ExtremaHistory.RemoveAt(0, ExtremaHistory.Num() - HistoryLimit, EAllowShrinking::No);
+		}
+
+		for (FDepthGraphExtremaSample& Sample : ExtremaHistory)
+		{
+			if (Sample.SampleIndex < StartIndex || Sample.SampleIndex >= TotalSamples)
+			{
+				continue;
+			}
+
+			const int32 LocalSampleIndex = Sample.SampleIndex - StartIndex;
+			if (!GraphPoints.IsValidIndex(LocalSampleIndex))
+			{
+				continue;
+			}
+
+			const float NormalizedDepth = FMath::Clamp((Sample.Depth - MinDepth) / DepthRange, 0.0f, 1.0f);
+			Sample.ScreenPosition = FVector2D(GraphPoints[LocalSampleIndex].X, Top + NormalizedDepth * PlotHeight);
+		}
+
 		const float ExtremesSize = FMath::Max(5.0f, CurrentPointSize * 1.5f);
-		const FSlateFontInfo VolumeFont = FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 10);
+		const FSlateFontInfo VolumeFont = FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), 15);
 		const FLinearColor TextColor = FLinearColor::White;
-		
+		const int32 VisiblePhaseCount = FMath::Max(0, Extrema.Num() - 1);
+		const int32 PhaseOffset = FMath::Max(0, VolumeLabels.Num() - VisiblePhaseCount);
+
 		for (int32 i = 0; i < Extrema.Num(); ++i)
 		{
 			const GraphMath::FBreathPoint& Extreme = Extrema[i];
@@ -338,7 +400,6 @@ int32 UDepthGraphWidget::NativePaint(
 				const FVector2D& ExtremePoint = GraphPoints[Extreme.Index];
 				const FVector2D MarkerTopLeft = ExtremePoint - FVector2D(ExtremesSize * 0.5f, ExtremesSize * 0.5f);
 				
-				// Usa colori diversi: Verde per massimi (Peak), Rosso per minimi (Valley)
 				FLinearColor MarkerColor = Extreme.bIsPeak ? FLinearColor::Green : FLinearColor::Red;
 
 				FSlateDrawElement::MakeBox(
@@ -353,27 +414,25 @@ int32 UDepthGraphWidget::NativePaint(
 					MarkerColor
 				);
 
-				// Disegna la label per il segmento che termina al prossimo estremo (i+1)
-				if (bShowVolumeOnExtrema && i + 1 < Extrema.Num() && i < VolumeLabels.Num())
+				const int32 VolumePhaseIndex = PhaseOffset + i;
+				if (bShowVolumeOnExtrema && i + 1 < Extrema.Num() && VolumeLabels.IsValidIndex(VolumePhaseIndex))
 				{
-					const FGraphLabel& Label = VolumeLabels[i];
 					const GraphMath::FBreathPoint& NextExtreme = Extrema[i + 1];
 
 					if (NextExtreme.Index >= 0 && NextExtreme.Index < GraphPoints.Num())
 					{
 						const FVector2D& LabelPoint = GraphPoints[NextExtreme.Index];
-						const float DeltaVolume = Label.Value / 1000000.0f; // mm3 to L
-						FString VolumeStr = FString::Printf(TEXT("%.2f L"), DeltaVolume);
+						const FString VolumeStr = FString::Printf(TEXT("%.2f"), (VolumeLabels[VolumePhaseIndex] / 1000000.0f));
 						
-						// Position: Above Green, Below Red
+						// Position from anchored extremum to avoid frame-to-frame offset flips.
 						FVector2f TextOffset;
-						if (Label.bIsPeak)
+						if (NextExtreme.bIsPeak)
 						{
-							TextOffset = FVector2f(-20.0f, -22.0f);
+							TextOffset = FVector2f(-20.0f, 20.0f);
 						}
 						else
 						{
-							TextOffset = FVector2f(-20.0f, 15.0f);
+							TextOffset = FVector2f(-20.0f, -20.0f);
 						}
 
 						FSlateDrawElement::MakeText(

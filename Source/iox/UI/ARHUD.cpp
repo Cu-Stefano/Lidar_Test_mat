@@ -377,7 +377,7 @@ bool AARHUD::TryGetSternumBoundsUV(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV,
 
     const float SternumU = ThoraxMinUV.X + (ThoraxWidth * 0.5f);
     const float SternumV = ThoraxMinUV.Y + (ThoraxHeight * 0.5f);
-
+ 
     const float BoxSize = ThoraxWidth * AreaSize;
     const float HalfBoxSize = BoxSize * 0.5f;
 
@@ -627,31 +627,48 @@ void AARHUD::UpdateMainPanelDepth()
         return;
     }
 
-    // 1. Find Extrema on the global average thorax history
+    if (ThoraxZones.Num() == 0)
+    {
+        return;
+    }
+
+    // Find global extrema on thorax history.
     TArray<float> XValues;
     XValues.SetNum(ThoraxDepthHistory.Num());
     for (int32 i = 0; i < XValues.Num(); ++i) XValues[i] = (float)i;
-    
-    // get the first zone extremns to ha ve size reference
-    TArray<GraphExtr::FBreathSection> GlobalExtrema = ThoraxZones[0].GetBreathSections();
 
-    // 2. Map global extrema to a total respirated volume using GraphExtr::FBreathSection from all zones
-    TArray<FGraphLabel> Labels;
-    if(GlobalExtrema.Num() >= 2){
-        // For each global extremum (starting from the second one to have a segment)
-        for (int32 i = 0; i < GlobalExtrema.Num(); ++i)
-        {
-            float TotalSegmentVolume = 0.0f;
-            for (const FThoraxZone& Zone : ThoraxZones)
-            {
-                GraphExtr::FBreathSection Section = Zone.GetBreathSectionAtIndex(i);
-                TotalSegmentVolume += Section.Volume;
-            }
-            
-            Labels.Add(FGraphLabel(GlobalExtrema[i].EndPoint.Index, TotalSegmentVolume, GlobalExtrema[i].EndPoint.bIsPeak));
-        }
+    TArray<GraphMath::FBreathPoint> ThoraxExtreme = GraphMath::FindExtrema(XValues, ThoraxDepthHistory, 0.05f, 30);
+
+    if (ThoraxExtreme.Num() < 2)
+    {
+        MainPanelWidget->UpdateThoraxDepthGraph(ThoraxDepthHistory, TArray<float>(), LastThoraxDepth, bHasThoraxDepthReading);
+        return;
     }
-    MainPanelWidget->UpdateThoraxDepthGraph(ThoraxDepthHistory, Labels, LastThoraxDepth, bHasThoraxDepthReading);
+
+    const int32 PhaseCount = ThoraxExtreme.Num() - 1;
+    TArray<float> TotalVolumes;
+    TotalVolumes.SetNumZeroed(PhaseCount);
+
+    for (int32 PhaseIndex = 0; PhaseIndex < PhaseCount; ++PhaseIndex)
+    {
+        const int32 StartIndex = ThoraxExtreme[PhaseIndex].Index;
+        const int32 EndIndex = ThoraxExtreme[PhaseIndex + 1].Index;
+
+        if (StartIndex < 0 || EndIndex < 0 || EndIndex <= StartIndex)
+        {
+            continue;
+        }
+
+        float PhaseVolume = 0.0f;
+        for (const FThoraxZone& Zone : ThoraxZones)
+        {
+            PhaseVolume += Zone.GetVolumeBetweenIndexes(StartIndex, EndIndex);
+        }
+
+        TotalVolumes[PhaseIndex] = PhaseVolume;
+    }
+
+    MainPanelWidget->UpdateThoraxDepthGraph(ThoraxDepthHistory, TotalVolumes, LastThoraxDepth, bHasThoraxDepthReading);
 }
 
 FVector2D AARHUD::ToScreenSpace(float X, float Y) const

@@ -7,6 +7,15 @@
 #include "Graph/GraphTypes.h"
 #include "UDepthGraphWidget.generated.h"
 
+struct FDepthGraphExtremaSample
+{
+	int32 SampleIndex = INDEX_NONE;
+	float Depth = 0.0f;
+	bool bIsPeak = false;
+	FVector2D ScreenPosition = FVector2D::ZeroVector;
+	FLinearColor MarkerColor = FLinearColor::White;
+};
+
 UCLASS()
 class IOX_API UDepthGraphWidget : public UUserWidget
 {
@@ -14,11 +23,16 @@ class IOX_API UDepthGraphWidget : public UUserWidget
 
 public:
 	UFUNCTION(BlueprintCallable, Category="Depth Graph")
-	void SetGraphData(const TArray<float>& InDepthHistory, const TArray<FGraphLabel>& InLabels, float InCurrentDepth, bool bInHasDepth);
+	void SetGraphData(const TArray<float>& InDepthHistory, const TArray<float>& TotalVolumes, const float InCurrentDepth, const bool bInHasDepth);
+
+	const TArray<FDepthGraphExtremaSample>& GetExtremaHistory() const
+	{
+		return ExtremaHistory;
+	}
 
 protected:
 	UPROPERTY(BlueprintReadOnly, Category="Depth Graph|Data")
-	TArray<FGraphLabel> VolumeLabels;
+	TArray<float> VolumeLabels;
 	virtual int32 NativePaint(
 		const FPaintArgs& Args,
 		const FGeometry& AllottedGeometry,
@@ -77,6 +91,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|Smoothing", meta=(ClampMin="0.01", ClampMax="1.0", UIMin="0.05", UIMax="0.8"))
 	float DepthSmoothingAlpha = 0.20f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|Extrema", meta=(ClampMin="1", ClampMax="50"))
+	int32 MaxExtremaHistory = 10;
+
 	UPROPERTY(BlueprintReadOnly, Category="Depth Graph|Data")
 	TArray<float> DepthHistory;
 
@@ -85,4 +102,6 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, Category="Depth Graph|Data")
 	bool bHasDepth = false;
+
+	mutable TArray<FDepthGraphExtremaSample> ExtremaHistory;
 };

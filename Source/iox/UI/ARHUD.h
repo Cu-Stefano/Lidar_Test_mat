@@ -29,6 +29,7 @@ class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class UTextureRenderTarget2D;
 class UFont;
+struct FGraphLabel;
 
 UCLASS()
 class IOX_API AARHUD : public AHUD
@@ -275,6 +276,7 @@ private:
     void RecordThoraxDepthSample(float DepthUnits);
     void RecordSternumDepthSample(float DepthUnits);
     void UpdateMainPanelDepth();
+
     bool TryGetThoraxBoundsUV(const TArray<FPoseJoint>& Joints, FVector2D& OutMinUV, FVector2D& OutMaxUV) const;
     bool TryGetSternumBoundsUV(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV, FVector2D& OutMinUV, FVector2D& OutMaxUV, float SternumAreaSize) const;
     bool CaptureDepthFrameData();
