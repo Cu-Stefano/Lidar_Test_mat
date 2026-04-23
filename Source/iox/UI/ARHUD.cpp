@@ -20,6 +20,7 @@
 #include "UI/MainPanel.h"
 #include "Utils/Constants.h"
 #include "Graph/GraphTypes.h"
+#include "Graph/UDepthGraphWidget.h"
 
 static const TMap<FString, EThoraxJointRole>& GetThoraxJointRoleDictionary()
 {
@@ -444,88 +445,12 @@ void AARHUD::ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxU
 
     if (bLogThoraxZoneDepths)
     {
-        float TotalVolume = 0.0f;
-        if (CalculateThoraxTotalVolume(TotalVolume))
+        if (MainPanelWidget)
         {
-            if (MainPanelWidget)
-            {
-                MainPanelWidget->UpdateTotalVolume(TotalVolume);
-            }
-            UE_LOG(LogTemp, Log, TEXT("[ThoraxZones %dx%d Extrema | Total Volume: %.8f L]"), N, N, TotalVolume / 1000000.0f);
+            MainPanelWidget->UpdateTotalVolume(AvgVolume);
         }
+        UE_LOG(LogTemp, Log, TEXT("[ThoraxZones %dx%d Extrema | Total Volume: %.8f L]"), N, N, AvgVolume / 1000000.0f);   
     }
-}
-
-bool AARHUD::CalculateThoraxTotalVolume(float& OutTotalVolume)
-{
-    OutTotalVolume = 0.0f;
-    ICameraWithDepth* Camera = CameraWithDepthProvider.GetInterface();
-    const FVector2D FocalLength = Camera ? Camera->GetCameraFocalLength() : FVector2D(-1.0f, -1.0f);
-    const float ResX = CameraRenderTarget ? static_cast<float>(CameraRenderTarget->SizeX) : 0.0f;
-    const float ResY = CameraRenderTarget ? static_cast<float>(CameraRenderTarget->SizeY) : 0.0f;
-
-    const int32 N = FMath::Max(1, NumThoraxZones);
-    const int32 TotalZones = N * N;
-
-    bool bAnyExtremaChanged = false;
-
-    for (int32 i = 0; i < TotalZones; ++i)
-    {
-        if (!ThoraxZones.IsValidIndex(i)) continue;
-
-        FThoraxZone& Zone = ThoraxZones[i];
-        float Max = 0.0f, Min = 0.0f;
-
-        if (Zone.GetLastMaxMinBreath(Max, Min))
-        {
-            if (i == 0)
-            {
-                if (FMath::Abs(Max - LastVolumeFirstMax) > 0.01f || FMath::Abs(Min - LastVolumeFirstMin) > 0.01f)
-                {
-                    bAnyExtremaChanged = true;
-                    LastVolumeFirstMax = Max;
-                    LastVolumeFirstMin = Min;
-                }
-                else return false; // Indica che e' stato preso lo stessa coppia di max min di prima
-            }
-
-            OutTotalVolume += Zone.GetRespirationVolume();
-        }
-    }
-
-    return bAnyExtremaChanged;
-}
-
-bool AARHUD::CalculateInstantTotalVolume(float& OutTotalVolume)
-{
-    OutTotalVolume = 0.0f;
-    ICameraWithDepth* Camera = CameraWithDepthProvider.GetInterface();
-    if (!Camera) return false;
-
-    const FVector2D FocalLength = Camera->GetCameraFocalLength();
-    const float ResX = CameraRenderTarget ? static_cast<float>(CameraRenderTarget->SizeX) : 0.0f;
-    const float ResY = CameraRenderTarget ? static_cast<float>(CameraRenderTarget->SizeY) : 0.0f;
-
-    if (FocalLength.X <= 0.0f || ResX <= 0.0f) return false;
-
-    for (const FThoraxZone& Zone : ThoraxZones)
-    {
-        const float Depth = Zone.GetLastDepth();
-        if (Depth <= 0.0f) continue;
-
-        const FVector2D MinUV = Zone.GetZoneMinUV();
-        const FVector2D MaxUV = Zone.GetZoneMaxUV();
-        const float UVWidth = FMath::Abs(MaxUV.X - MinUV.X);
-        const float UVHeight = FMath::Abs(MaxUV.Y - MinUV.Y);
-
-        // Volume = Area * Depth
-        // Area = (UVWidth * ResX * Depth / FocalX) * (UVHeight * ResY * Depth / FocalY)
-        const float WidthMM = (UVWidth * ResX * Depth) / FocalLength.X;
-        const float HeightMM = (UVHeight * ResY * Depth) / FocalLength.Y;
-        OutTotalVolume += WidthMM * HeightMM * Depth;
-    }
-
-    return ThoraxZones.Num() > 0;
 }
 
 void AARHUD::PushMaterialToWidget(TObjectPtr<UMaterialInterface> Material)
@@ -583,8 +508,6 @@ void AARHUD::UpdateMainPanelState()
         bShowMainPanel ? ESlateVisibility::Visible : ESlateVisibility::Collapsed
     );
 }
-
-#include "Graph/UDepthGraphWidget.h"
 
 void AARHUD::RecordThoraxDepthSample(const float DepthUnits)
 {
@@ -667,6 +590,18 @@ void AARHUD::UpdateMainPanelDepth()
 
         TotalVolumes[PhaseIndex] = PhaseVolume;
     }
+
+    //media di TotalVolumes
+    float Avg = 0.0f;
+    for (const float Volume : TotalVolumes)
+    {
+        Avg += Volume;
+    }
+    if (TotalVolumes.Num() > 0)
+    {
+        Avg /= TotalVolumes.Num();
+    }
+    AvgVolume = Avg;
 
     MainPanelWidget->UpdateThoraxDepthGraph(ThoraxDepthHistory, TotalVolumes, LastThoraxDepth, bHasThoraxDepthReading);
 }

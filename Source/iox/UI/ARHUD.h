@@ -232,8 +232,6 @@ protected:
 
     TArray<float> ThoraxDepthHistory;
 
-    bool CalculateInstantTotalVolume(float& OutTotalVolume);
-
     // ================= Sternum Sampling Overlay =================
     UPROPERTY(EditAnywhere, Category="Overlay|Sternum")
     TObjectPtr<UMaterialInterface> SternumAreaMaterial = nullptr;
@@ -290,6 +288,7 @@ private:
         float& OutDepthSampleConfidence
     );
     void ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV);
-    bool CalculateThoraxTotalVolume(float& OutTotalVolume);
     EThoraxJointRole ResolveThoraxJointRole(const FString& RawName) const;
+
+    float AvgVolume = 0.0f;
 };
