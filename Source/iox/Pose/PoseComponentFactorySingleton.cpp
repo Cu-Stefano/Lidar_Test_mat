@@ -30,7 +30,7 @@ TScriptInterface<IIPoseDetector> PoseComponentFactorySingleton::CreatePoseCompon
         return Result;
     }
 
-    UDefaultPoseDetector* Component = NewObject<UDefaultPoseDetector>(
+    TObjectPtr<UDefaultPoseDetector> Component = NewObject<UDefaultPoseDetector>(
         Owner,
         UDefaultPoseDetector::StaticClass(),
         TEXT("DefaultPoseDetector")

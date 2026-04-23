@@ -3,24 +3,22 @@
 
 #include "UI/ARHUD.h"
 
-#include "Blueprint/WidgetTree.h"
 #include "Blueprint/UserWidget.h"
-#include "Components/Widget.h"
 #include "Engine/Canvas.h"
 #include "Engine/Font.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Kismet/KismetRenderingLibrary.h"
 #include "Pose/DefaultPoseDetector.h"
-#include "BodyPoseManager.h"
 #include "Camera/CameraFactorySingleton.h"
 #include "Pose/PoseComponentFactorySingleton.h"
 #include "Camera/ICameraWithDepth.h"
 #include "Graph/UDepthGraphWidget.h"
 #include "UI/MainPanel.h"
 #include "Utils/Constants.h"
-#include "Graph/GraphTypes.h"
-#include "Graph/UDepthGraphWidget.h"
+#include "Camera/DepthSampler.h"
+#include "Graph/GraphMath.h"
+#include "Math/NumericLimits.h"
 
 static const TMap<FString, EThoraxJointRole>& GetThoraxJointRoleDictionary()
 {
@@ -53,9 +51,11 @@ void AARHUD::BeginPlay()
         UE_LOG(LogTemp, Warning, TEXT("AARHUD: PoseDetectorProvider creation failed."));
     }
 
-    // Camera + Depth Component
-    CameraFactorySingleton& Factory = CameraFactorySingleton::GetInstance();
-    CameraWithDepthProvider = Factory.CreateCamera(TEXT("Unreal"), this);
+    if (!CameraWithDepthProvider.GetObject())
+    {
+        CameraFactorySingleton& Factory = CameraFactorySingleton::GetInstance();
+        CameraWithDepthProvider = Factory.CreateCamera(CameraTypeName, this);
+    }
 
     if (!CameraWithDepthProvider.GetObject())
     {
@@ -100,6 +100,11 @@ void AARHUD::BeginPlay()
     UpdateMainPanelDepth();
 
     DepthSampler = NewObject<UDepthSampler>(this);
+
+    if (CameraWithDepthProvider.GetObject())
+    {
+        CameraWithDepthProvider->StartCamera();
+    }
 }
 
 void AARHUD::GetThoraxDepthHistory(TArray<float>& OutHistory, float& OutLatestDepth, bool& bOutHasDepth) const
@@ -124,7 +129,7 @@ void AARHUD::Tick(float DeltaSeconds)
 
     if (DepthMaterial && CameraWithDepth)
     {
-        if (UTexture* DepthTexture = CameraWithDepth->GetDepthTexture())
+        if (TObjectPtr<UTexture> DepthTexture = CameraWithDepth->GetDepthTexture())
         {
             DepthMaterial->SetTextureParameterValue(DepthTextureParameterName, DepthTexture);
 
@@ -139,7 +144,7 @@ void AARHUD::Tick(float DeltaSeconds)
 
         if (CameraMaterial && CameraWithDepth)
     {
-            if (UTexture* CameraTexture = CameraWithDepth->GetCameraTexture())
+            if (TObjectPtr<UTexture> CameraTexture = CameraWithDepth->GetCameraTexture())
             {
                 CameraMaterial->SetTextureParameterValue(CameraTextureParameterName, CameraTexture);
             }
@@ -533,22 +538,6 @@ void AARHUD::RecordThoraxDepthSample(const float DepthUnits)
     }
 }
 
-void AARHUD::RecordSternumDepthSample(const float DepthUnits)
-{
-    if (!FMath::IsFinite(DepthUnits))
-    {
-        return;
-    }
-
-    SternumDepthHistory.Add(DepthUnits);
-
-    const int32 MaxSamples = FMath::Max(1, ThoraxDepthHistoryMaxSamples);
-    if (SternumDepthHistory.Num() > MaxSamples)
-    {
-        const int32 SamplesToTrim = SternumDepthHistory.Num() - MaxSamples;
-        SternumDepthHistory.RemoveAt(0, SamplesToTrim, EAllowShrinking::No);
-    }
-}
 
 void AARHUD::UpdateMainPanelDepth()
 {

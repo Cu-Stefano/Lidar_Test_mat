@@ -8,7 +8,6 @@
 #include "Camera/ICameraWithDepth.h"
 #include "Pose/IPoseDetector.h"
 #include "Utils/Constants.h"
-#include "Camera/DepthSampler.h"
 #include "UI/HUDOverlayDrawer.h"
 #include "Graph/ThoraxZone.h"
 #include "ARHUD.generated.h"
@@ -29,7 +28,7 @@ class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class UTextureRenderTarget2D;
 class UFont;
-struct FGraphLabel;
+class UDepthSampler;
 
 UCLASS()
 class IOX_API AARHUD : public AHUD
@@ -99,6 +98,9 @@ protected:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="UI")
     TScriptInterface<ICameraWithDepth> CameraWithDepthProvider;
+
+    UPROPERTY(EditAnywhere, Category="Camera", meta=(GetOptions="GetCameraTypeOptions"))
+    FString CameraTypeName = TEXT("Unreal");
 
     // ================= Materiali =================
     UPROPERTY(EditAnywhere, Category="UI")
@@ -201,11 +203,6 @@ protected:
     UPROPERTY(EditAnywhere, Category="Pose|ThoraxZones")
     float ThoraxZoneDotSize = 8.0f;
     
-    float LastCalculatedTotalVolume = 0.0f;
-
-    float LastVolumeFirstMax = 0.0f;
-    float LastVolumeFirstMin = 0.0f;
-
     TArray<FThoraxZone> ThoraxZones;
     
     FVector2D ActiveThoraxMinUV = FVector2D::ZeroVector;
@@ -268,33 +265,17 @@ protected:
         bool bVolumeCalculated = false;
     };
 
+
 private:
-    void ValidateEditorAssignments() const;
     void PushMaterialToWidget(TObjectPtr<UMaterialInterface> Material);
     void UpdateDepthWidgetState();
     void UpdateMainPanelState();
-    void DrawDepthToggleButton();
-    void DrawChestSamplingArea();
-    void DrawSternumArea();
-    void DrawThoraxZoneDots();
     FVector2D ToScreenSpace(float X, float Y) const;
-    void DrawJointsOverlay();
     void RecordThoraxDepthSample(float DepthUnits);
-    void RecordSternumDepthSample(float DepthUnits);
     void UpdateMainPanelDepth();
 
     bool TryGetThoraxBoundsUV(const TArray<FPoseJoint>& Joints, FVector2D& OutMinUV, FVector2D& OutMaxUV) const;
     bool TryGetSternumBoundsUV(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV, FVector2D& OutMinUV, FVector2D& OutMaxUV, float SternumAreaSize) const;
-    bool CaptureDepthFrameData();
-    bool ComputeDepthMeanInBoundsUV(
-        const FVector2D& MinUV,
-        const FVector2D& MaxUV,
-        float& OutMeanDepthValue,
-        int32& OutSampleCount,
-        float& OutMinDepthValue,
-        float& OutMaxDepthValue,
-        float& OutDepthSampleConfidence
-    );
     void ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV);
     EThoraxJointRole ResolveThoraxJointRole(const FString& RawName) const;
 

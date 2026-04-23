@@ -8,7 +8,7 @@
 #include "MockCamera.generated.h"
 
 
-UCLASS()
+UCLASS(Blueprintable, BlueprintType)
 class IOX_API UMockCamera : public UObject, public ICameraWithDepth
 {
 	GENERATED_BODY()
@@ -21,7 +21,10 @@ public:
 	virtual TObjectPtr<UTexture> GetConfidenceTexture() const override;
 	virtual FVector2D GetCameraFocalLength() const override;
 
+	virtual bool StartCamera() override { return true; }
+	virtual void StopCamera() override {}
+
 private:
-	UPROPERTY()
+	UPROPERTY(EditAnywhere, Category = "Mock")
 	TObjectPtr<class UTexture2D> MockTexture;
 };

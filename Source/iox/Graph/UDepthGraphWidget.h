@@ -4,8 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "Graph/GraphTypes.h"
 #include "UDepthGraphWidget.generated.h"
+
+class FPaintArgs;
+class FSlateWindowElementList;
+struct FGeometry;
+class FSlateRect;
+class FWidgetStyle;
 
 struct FDepthGraphExtremaSample
 {

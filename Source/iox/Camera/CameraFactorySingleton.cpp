@@ -2,15 +2,9 @@
 
 
 #include "Camera/CameraFactorySingleton.h"
-#include "Camera/ARUnrealCamera.h"
-#include "Camera/MockCamera.h"
 #include "Camera/ICameraWithDepth.h"
+#include "Utils/IOXSettings.h"
 
-// Definizione dei dispositivi supportati
-const TArray<FString> CameraFactorySingleton::SupportedCameraTypes = {
-    TEXT("Unreal"),
-    TEXT("Mock"),
-};
 
 CameraFactorySingleton& CameraFactorySingleton::GetInstance()
 {
@@ -21,29 +15,44 @@ CameraFactorySingleton& CameraFactorySingleton::GetInstance()
 TScriptInterface<ICameraWithDepth> CameraFactorySingleton::CreateCamera(const FString& TypeName, TObjectPtr<UObject> Outer)
 {
     TScriptInterface<ICameraWithDepth> Camera;
-    UObject* EffectiveOuter = Outer ? Outer : GetTransientPackage();
+    TObjectPtr<UObject> EffectiveOuter = Outer ? Outer : GetTransientPackage();
 
-    if (TypeName.Equals(TEXT("Unreal"), ESearchCase::IgnoreCase))
+    // 1. Check if there's a class mapped in Project Settings
+    if (const UIOXSettings* Settings = UIOXSettings::Get())
     {
-        UARUnrealCamera* Provider = NewObject<UARUnrealCamera>(EffectiveOuter);
-        Camera.SetObject(Provider);
-        Camera.SetInterface(Cast<ICameraWithDepth>(Provider));
+        if (const TSubclassOf<UObject>* ClassPtr = Settings->CameraClassMap.Find(TypeName))
+        {
+            if (*ClassPtr)
+            {
+                return CreateCameraByClass(*ClassPtr, EffectiveOuter);
+            }
+        }
     }
-    else if (TypeName.Equals(TEXT("Mock"), ESearchCase::IgnoreCase))
+
+    UE_LOG(LogTemp, Warning, TEXT("CameraFactorySingleton: Unsupported camera type '%s'. Ensure it is configured in Project Settings -> IOX Settings."), *TypeName);
+    return Camera;
+}
+
+TScriptInterface<ICameraWithDepth> CameraFactorySingleton::CreateCameraByClass(TSubclassOf<UObject> CameraClass, TObjectPtr<UObject> Outer)
+{
+    TScriptInterface<ICameraWithDepth> Camera;
+    if (!CameraClass)
     {
-        UMockCamera* Provider = NewObject<UMockCamera>(EffectiveOuter);
-        Camera.SetObject(Provider);
-        Camera.SetInterface(Cast<ICameraWithDepth>(Provider));
-    }
-    else
-    {
-        UE_LOG(LogTemp, Warning, TEXT("CameraFactorySingleton: Unsupported camera type '%s'"), *TypeName);
         return Camera;
     }
 
-    if (Camera.GetObject())
+    TObjectPtr<UObject> EffectiveOuter = Outer ? Outer : GetTransientPackage();
+    TObjectPtr<UObject> NewCamera = NewObject<UObject>(EffectiveOuter, CameraClass);
+    
+    if (NewCamera && NewCamera->Implements<UCameraWithDepth>())
     {
-        UE_LOG(LogTemp, Log, TEXT("CameraFactorySingleton: Created camera of type '%s'"), *TypeName);
+        Camera.SetObject(NewCamera);
+        Camera.SetInterface(Cast<ICameraWithDepth>(NewCamera));
+        UE_LOG(LogTemp, Log, TEXT("CameraFactorySingleton: Created camera from class '%s'"), *CameraClass->GetName());
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("CameraFactorySingleton: Class '%s' does not implement ICameraWithDepth"), *CameraClass->GetName());
     }
 
     return Camera;
@@ -51,12 +60,19 @@ TScriptInterface<ICameraWithDepth> CameraFactorySingleton::CreateCamera(const FS
 
 bool CameraFactorySingleton::IsTypeSupported(const FString& TypeName) const
 {
-    return SupportedCameraTypes.ContainsByPredicate([&TypeName](const FString& Type) {
-        return Type.Equals(TypeName, ESearchCase::IgnoreCase);
-    });
+    if (const UIOXSettings* Settings = UIOXSettings::Get())
+    {
+        return Settings->CameraClassMap.Contains(TypeName);
+    }
+    return false;
 }
 
 TArray<FString> CameraFactorySingleton::GetSupportedTypes()
 {
-    return SupportedCameraTypes;
+    TArray<FString> AllTypes;
+    if (const UIOXSettings* Settings = UIOXSettings::Get())
+    {
+        Settings->CameraClassMap.GetKeys(AllTypes);
+    }
+    return AllTypes;
 }

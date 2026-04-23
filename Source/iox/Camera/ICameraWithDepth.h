@@ -27,4 +27,7 @@ public:
     virtual TObjectPtr<UTexture> GetCameraTexture() const = 0;
     virtual TObjectPtr<UTexture> GetConfidenceTexture() const = 0;
     virtual FVector2D GetCameraFocalLength() const = 0;
+
+    virtual bool StartCamera() { return true; }
+    virtual void StopCamera() {}
 };

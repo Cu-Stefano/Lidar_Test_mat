@@ -207,17 +207,4 @@ bool FThoraxZone::GetZoneDimensionsMM(float& OutWidthMM, float& OutHeightMM) con
     return true;
 }
 
-GraphExtr::FBreathSection FThoraxZone::GetBreathSectionAtIndex(const int32 Index) const
-{
-    if (BreathSections.IsValidIndex(Index))
-    {
-        return BreathSections[Index];
-    }
-    return GraphExtr::FBreathSection();
-}
-
-TArray<GraphExtr::FBreathSection> FThoraxZone::GetBreathSections() const
-{
-    return BreathSections;
-}
 

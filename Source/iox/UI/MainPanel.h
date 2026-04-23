@@ -4,8 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "Graph/UDepthGraphWidget.h"
-#include "Graph/GraphTypes.h"
 #include "MainPanel.generated.h"
 
 class UDepthGraphWidget;

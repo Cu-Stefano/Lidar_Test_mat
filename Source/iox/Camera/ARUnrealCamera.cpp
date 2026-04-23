@@ -4,10 +4,8 @@
 #include "Camera/ARUnrealCamera.h"
 #include "ARBlueprintLibrary.h"
 #include "ARTextures.h"
+#include "ARSessionConfig.h"
 
-UARUnrealCamera::UARUnrealCamera()
-{
-}
 
 TObjectPtr<UTexture> UARUnrealCamera::GetDepthTexture() const
 {
@@ -32,5 +30,22 @@ FVector2D UARUnrealCamera::GetCameraFocalLength() const
 		return Intrinsics.FocalLength;
 	}
 	return FVector2D(-1.0f, .0f);
+}
+
+bool UARUnrealCamera::StartCamera()
+{
+	if (!SessionConfig)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UARUnrealCamera: Cannot start camera, SessionConfig is null."));
+		return false;
+	}
+
+	UARBlueprintLibrary::StartARSession(SessionConfig);
+	return true;
+}
+
+void UARUnrealCamera::StopCamera()
+{
+	UARBlueprintLibrary::StopARSession();
 }
 

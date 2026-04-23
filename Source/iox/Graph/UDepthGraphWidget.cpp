@@ -8,6 +8,10 @@
 #include "Fonts/SlateFontInfo.h"
 #include "Rendering/DrawElements.h"
 #include "Styling/CoreStyle.h"
+#include "HAL/PlatformTime.h"
+#include "Layout/Geometry.h"
+#include "Rendering/SlateLayoutTransform.h"
+#include "Math/NumericLimits.h"
 
 void UDepthGraphWidget::SetGraphData(const TArray<float>& InDepthHistory, const TArray<float>& TotalVolumes, const float InCurrentDepth, const bool bInHasDepth)
 {
@@ -15,23 +19,6 @@ void UDepthGraphWidget::SetGraphData(const TArray<float>& InDepthHistory, const 
 	VolumeLabels = TotalVolumes;
 	CurrentDepth = InCurrentDepth;
 	bHasDepth = bInHasDepth;
-
-	const float NowSeconds = FPlatformTime::Seconds();
-	{
-		static float LastSetGraphDataLogSeconds = 0.0;
-		// if (NowSeconds - LastSetGraphDataLogSeconds > 0.5)
-		// {
-		// 	UE_LOG(
-		// 		LogTemp,
-		// 		Log,
-		// 		TEXT("DepthGraphWidget: SetGraphData history=%d current=%.6f hasDepth=%s"),
-		// 		DepthHistory.Num(),
-		// 		CurrentDepth,
-		// 		bHasDepth ? TEXT("true") : TEXT("false")
-		// 	);
-		// 	LastSetGraphDataLogSeconds = NowSeconds;
-		// }
-	}
 
 	InvalidateLayoutAndVolatility();
 }
@@ -57,39 +44,10 @@ int32 UDepthGraphWidget::NativePaint(
 	);
 
 	const FVector2D WidgetSize = AllottedGeometry.GetLocalSize();
-	{
-		static float LastNativePaintEntryLogSeconds = 0.0;
-		const float NowSeconds = FPlatformTime::Seconds();
-		// if (NowSeconds - LastNativePaintEntryLogSeconds > 1.0)
-		// {
-		// 	UE_LOG(
-		// 		LogTemp,
-		// 		Log,
-		// 		TEXT("DepthGraphWidget: NativePaint enter size=(%.1f, %.1f) hasDepth=%s samples=%d"),
-		// 		WidgetSize.X,
-		// 		WidgetSize.Y,
-		// 		bHasDepth ? TEXT("true") : TEXT("false"),
-		// 		DepthHistory.Num()
-		// 	);
-		// 	LastNativePaintEntryLogSeconds = NowSeconds;
-		// }
-	}
 
 	if (WidgetSize.X <= 1.0f || WidgetSize.Y <= 1.0f)
 	{
 		static float LastTinySizeLogSeconds = 0.0;
-		const float NowSeconds = FPlatformTime::Seconds();
-		// if (NowSeconds - LastTinySizeLogSeconds > 1.0)
-		// {
-		// 	UE_LOG(
-		// 		LogTemp,
-		// 		Warning,
-		// 		TEXT("DepthGraphWidget: NativePaint skip tiny size=(%.2f, %.2f)"),
-		// 		WidgetSize.X,
-		// 		WidgetSize.Y
-		// 	);
-		// 	LastTinySizeLogSeconds = NowSeconds;
-		// }
 		return BaseLayer;
 	}
 
@@ -133,18 +91,6 @@ int32 UDepthGraphWidget::NativePaint(
 	if (!bHasDepth || DepthHistory.Num() < 2)
 	{
 		static float LastNoDataPaintLogSeconds = 0.0;
-		const float NowSeconds = FPlatformTime::Seconds();
-		// if (NowSeconds - LastNoDataPaintLogSeconds > 1.0)
-		// {
-		// 	UE_LOG(
-		// 		LogTemp,
-		// 		Log,
-		// 		TEXT("DepthGraphWidget: NativePaint skip (hasDepth=%s, samples=%d)"),
-		// 		bHasDepth ? TEXT("true") : TEXT("false"),
-		// 		DepthHistory.Num()
-		// 	);
-		// 	LastNoDataPaintLogSeconds = NowSeconds;
-		// }
 		return BaseLayer + 2;
 	}
 
@@ -160,24 +106,6 @@ int32 UDepthGraphWidget::NativePaint(
 	if (PlotWidth <= 2.0f || PlotHeight <= 2.0f)
 	{
 		static float LastSmallPlotLogSeconds = 0.0;
-		const float NowSeconds = FPlatformTime::Seconds();
-		// if (NowSeconds - LastSmallPlotLogSeconds > 1.0)
-		// {
-		// 	UE_LOG(
-		// 		LogTemp,
-		// 		Warning,
-		// 		TEXT("DepthGraphWidget: NativePaint skip small plot=(%.2f, %.2f) size=(%.2f, %.2f) padding=(L%.1f,T%.1f,R%.1f,B%.1f)"),
-		// 		PlotWidth,
-		// 		PlotHeight,
-		// 		WidgetSize.X,
-		// 		WidgetSize.Y,
-		// 		GraphPadding.Left,
-		// 		GraphPadding.Top,
-		// 		GraphPadding.Right,
-		// 		GraphPadding.Bottom
-		// 	);
-		// 	LastSmallPlotLogSeconds = NowSeconds;
-		// }
 		return BaseLayer + 2;
 	}
 
@@ -475,21 +403,6 @@ int32 UDepthGraphWidget::NativePaint(
 			CurrentPointColor
 		);
 
-		static float LastPaintOkLogSeconds = 0.0;
-		const float NowSeconds = FPlatformTime::Seconds();
-		// if (NowSeconds - LastPaintOkLogSeconds > 1.0)
-		// {
-		// 	UE_LOG(
-		// 		LogTemp,
-		// 		Log,
-		// 		TEXT("DepthGraphWidget: NativePaint drew %d points (min=%.6f, max=%.6f, current=%.6f)"),
-		// 		GraphPoints.Num(),
-		// 		MinDepth,
-		// 		MaxDepth,
-		// 		CurrentDepth
-		// 	);
-		// 	LastPaintOkLogSeconds = NowSeconds;
-		// }
 	}
 
 	return BaseLayer + 4;

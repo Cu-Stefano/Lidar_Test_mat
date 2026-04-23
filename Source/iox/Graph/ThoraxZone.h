@@ -36,9 +36,6 @@ public:
     float GetVolumeBetweenIndexes(int32 StartIndex, int32 EndIndex) const;
     bool GetZoneDimensionsMM(float& OutWidthMM, float& OutHeightMM) const;
     
-    GraphExtr::FBreathSection GetBreathSectionAtIndex(const int32 Index) const;
-    
-    TArray<GraphExtr::FBreathSection> GetBreathSections() const;
 private:
     FVector2D FocalLength = FVector2D::ZeroVector;
     FVector2D Resolution = FVector2D::ZeroVector;

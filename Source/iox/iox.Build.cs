@@ -21,7 +21,8 @@ public class iox : ModuleRules
             "PoseDetectionPlugin",
             "ImageWrapper",
             "RenderCore",
-            "RHI"
+            "RHI",
+            "DeveloperSettings"
         });
 
         PrivateDependencyModuleNames.AddRange(new string[] {
