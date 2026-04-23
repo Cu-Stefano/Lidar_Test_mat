@@ -40,73 +40,66 @@ class IOX_API AARHUD : public AHUD
 public:
     AARHUD();
 
-    UFUNCTION(BlueprintCallable, Category="UI|DepthGraph")
+    /** API for UI or external systems to get the current thorax data. */
+    UFUNCTION(BlueprintCallable, Category="IOX|DepthGraph")
     void GetThoraxDepthHistory(TArray<float>& OutHistory, float& OutLatestDepth, bool& bOutHasDepth) const;
-
-    UFUNCTION(BlueprintCallable, Category="UI|DepthGraph")
-    void GetSternumDepthHistory(TArray<float>& OutHistory, float& OutLatestDepth, bool& bOutHasDepth) const;
 
 protected:
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaSeconds) override;
     virtual void DrawHUD() override;
-    virtual void NotifyHitBoxClick(FName BoxName) override;
 
-    // ================= UI =================
-    UPROPERTY(EditDefaultsOnly, Category="UI")
+private:
+    // ================= UI Components =================
+    UPROPERTY(EditDefaultsOnly, Category="IOX|UI", meta=(AllowPrivateAccess="true"))
     TSubclassOf<UUserWidget> DepthWidgetClass;
 
     UPROPERTY(Transient)
     TObjectPtr<UUserWidget> SceneDepthWidget = nullptr;
 
-    UPROPERTY(EditDefaultsOnly, Category="UI")
+    UPROPERTY(EditDefaultsOnly, Category="IOX|UI", meta=(AllowPrivateAccess="true"))
     TSubclassOf<UMainPanel> MainPanelClass;
 
     UPROPERTY(Transient)
     TObjectPtr<UMainPanel> MainPanelWidget = nullptr;
 
-    UPROPERTY(EditAnywhere, Category="UI|MainPanel")
+    UPROPERTY(EditAnywhere, Category="IOX|UI", meta=(AllowPrivateAccess="true"))
     bool bShowMainPanel = true;
 
-    UPROPERTY(EditAnywhere, Category="UI|DepthToggle")
-    bool bShowDepthOverlay = false;
+    // ================= Depth Debug =================
+    UPROPERTY(EditAnywhere, Category="IOX|Sampling", meta=(AllowPrivateAccess="true"))
+    bool bLogThoraxDepthMean = true;
 
-    UPROPERTY(EditAnywhere, Category="UI|DepthToggle")
-    bool bShowDepthToggleButton = true;
+    UFUNCTION()
+    TArray<FString> GetCameraTypeOptions() const;
 
-    UPROPERTY(EditAnywhere, Category="UI|DepthToggle")
-    FVector2D DepthToggleButtonPosition = FVector2D(24.0f, 24.0f);
-
-    UPROPERTY(EditAnywhere, Category="UI|DepthToggle")
-    FVector2D DepthToggleButtonSize = FVector2D(220.0f, 48.0f);
-
-    UPROPERTY(EditAnywhere, Category="UI|DepthToggle")
-    FLinearColor DepthToggleButtonOnColor = FLinearColor(0.10f, 0.45f, 0.18f, 0.90f);
-
-    UPROPERTY(EditAnywhere, Category="UI|DepthToggle")
-    FLinearColor DepthToggleButtonOffColor = FLinearColor(0.15f, 0.15f, 0.15f, 0.90f);
-
-    // ================= Rendering =================
-    UPROPERTY(EditAnywhere, Category="UI")
-    TObjectPtr<UTextureRenderTarget2D> CameraRenderTarget = nullptr;
-
-    UPROPERTY(EditAnywhere, Category="UI")
-    TObjectPtr<UTextureRenderTarget2D> DepthRenderTarget = nullptr;
-
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="UI")
-    TScriptInterface<IIPoseDetector> PoseDetectorProvider;
-
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="UI")
-    TScriptInterface<ICameraWithDepth> CameraWithDepthProvider;
-
-    UPROPERTY(EditAnywhere, Category="Camera", meta=(GetOptions="GetCameraTypeOptions"))
+    UPROPERTY(EditAnywhere, Category="IOX|Camera", meta=(AllowPrivateAccess="true", GetOptions="GetCameraTypeOptions"))
     FString CameraTypeName = TEXT("Unreal");
 
-    // ================= Materiali =================
-    UPROPERTY(EditAnywhere, Category="UI")
+    UFUNCTION()
+    TArray<FString> GetPoseDetectorOptions() const;
+
+    UPROPERTY(EditAnywhere, Category="IOX|Pose", meta=(AllowPrivateAccess="true", GetOptions="GetPoseDetectorOptions"))
+    FString PoseDetectorTypeName = TEXT("Default");
+
+    // ================= Provider States =================
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="IOX|Internal", meta=(AllowPrivateAccess="true"))
+    TScriptInterface<IIPoseDetector> PoseDetectorProvider;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="IOX|Internal", meta=(AllowPrivateAccess="true"))
+    TScriptInterface<ICameraWithDepth> CameraWithDepthProvider;
+
+    // ================= Rendering & Materials =================
+    UPROPERTY(EditAnywhere, Category="IOX|Rendering", meta=(AllowPrivateAccess="true"))
+    TObjectPtr<UTextureRenderTarget2D> CameraRenderTarget = nullptr;
+
+    UPROPERTY(EditAnywhere, Category="IOX|Rendering", meta=(AllowPrivateAccess="true"))
+    TObjectPtr<UTextureRenderTarget2D> DepthRenderTarget = nullptr;
+
+    UPROPERTY(EditAnywhere, Category="IOX|Materials", meta=(AllowPrivateAccess="true"))
     TObjectPtr<UMaterialInterface> DepthMaterialBase = nullptr;
 
-    UPROPERTY(EditAnywhere, Category="UI")
+    UPROPERTY(EditAnywhere, Category="IOX|Materials", meta=(AllowPrivateAccess="true"))
     TObjectPtr<UMaterialInterface> CameraMaterialBase = nullptr;
 
     UPROPERTY(Transient)
@@ -115,148 +108,77 @@ protected:
     UPROPERTY(Transient)
     TObjectPtr<UMaterialInstanceDynamic> CameraMaterial = nullptr;
 
-    UPROPERTY(EditAnywhere, Category="UI")
+    UPROPERTY(EditAnywhere, Category="IOX|Materials", meta=(AllowPrivateAccess="true"))
     FName DepthTextureParameterName = TEXT("DepthParam");
 
-    UPROPERTY(EditAnywhere, Category="UI")
+    UPROPERTY(EditAnywhere, Category="IOX|Materials", meta=(AllowPrivateAccess="true"))
     FName CameraTextureParameterName = TEXT("CameraTexture");
 
-    // ================= Chest Sampling Overlay =================
-    UPROPERTY(EditAnywhere, Category="Overlay|Chest")
+    // ================= Thorax Sampling Overlay =================
+    UPROPERTY(EditAnywhere, Category="IOX|Overlay", meta=(AllowPrivateAccess="true"))
     TObjectPtr<UMaterialInterface> ChestAreaMaterial = nullptr;
 
-    UPROPERTY(EditAnywhere, Category="Overlay|Chest")
+    UPROPERTY(EditAnywhere, Category="IOX|Overlay", meta=(AllowPrivateAccess="true"))
     bool bShowChestSamplingArea = true;
 
-    UPROPERTY(EditAnywhere, Category="Overlay|Chest")
+    UPROPERTY(EditAnywhere, Category="IOX|Overlay", meta=(AllowPrivateAccess="true"))
     FLinearColor ChestAreaFallbackColor = FLinearColor(0.2f, 0.9f, 0.3f, 0.25f);
 
-    UPROPERTY(EditAnywhere, Category="Overlay|Chest")
+    UPROPERTY(EditAnywhere, Category="IOX|Overlay", meta=(AllowPrivateAccess="true"))
     FLinearColor ChestAreaOutlineColor = FLinearColor(0.2f, 0.9f, 0.3f, 0.9f);
 
-    UPROPERTY(EditAnywhere, Category="Overlay|Chest", meta=(ClampMin="0.5", ClampMax="8.0"))
+    UPROPERTY(EditAnywhere, Category="IOX|Overlay", meta=(AllowPrivateAccess="true", ClampMin="0.5", ClampMax="8.0"))
     float ChestAreaOutlineThickness = 2.0f;
 
-    // ================= Joint Overlay =================
-    UPROPERTY(EditAnywhere, Category="Overlay")
-    bool bDrawJointDots = false;
+    // ================= UI Visibility =================
+    UPROPERTY(EditAnywhere, Category="IOX|UI", meta=(AllowPrivateAccess="true"))
+    bool bShowDepthOverlay = false;
 
-    UPROPERTY(EditAnywhere, Category="Overlay")
-    TObjectPtr<UMaterialInterface> JointDotMaterial = nullptr;
-
-    UPROPERTY(EditAnywhere, Category="Overlay")
-    FLinearColor JointTextColor = FLinearColor::Yellow;
-
-    UPROPERTY(EditAnywhere, Category="Overlay")
-    float JointDotSize = 10.0f;
-
-    UPROPERTY(EditAnywhere, Category="Overlay")
-    float JointTextScale = 0.8f;
-
-    UPROPERTY(EditAnywhere, Category="Overlay")
-    float JointTextYOffset = 20.0f;
-
-    UPROPERTY(EditAnywhere, Category="Overlay")
-    float MinJointConfidence = 0.05f;
-
-    UPROPERTY(EditAnywhere, Category="Overlay")
-    bool bFlipNormalizedJointY = true;
-
-    UPROPERTY(EditAnywhere, Category="Overlay")
-    bool bDrawJointLabels = false;
-
-    UPROPERTY(EditAnywhere, Category="Overlay")
-    TObjectPtr<UFont> JointFont = nullptr;
-
-    // ================= Depth Debug =================
-    UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
-    bool bLogThoraxDepthMean = true;
-
-    UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
-    bool bLogThoraxDepthMinMax = true;
-
-    UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
-    bool bLogThoraxDepthIn = true;
-
-    UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
-    bool bUseFloat32DepthSampling = false;
-
-    UPROPERTY(EditAnywhere, Category="Pose|DepthDebug")
-    bool bUseDepthSampleConfidenceFilter = true;
-
-    UPROPERTY(EditAnywhere, Category="Pose|DepthDebug", meta=(ClampMin="0.0", ClampMax="1.0"))
-    float MinDepthSampleConfidence = 0.45f;
-
-    // ================= Thorax Zone Grid =================
-    UPROPERTY(EditAnywhere, Category="Pose|ThoraxZones", meta=(ClampMin="1", ClampMax="10"))
-    int32 NumThoraxZones = 3;
-
-    UPROPERTY(EditAnywhere, Category="Pose|ThoraxZones")
-    bool bLogThoraxZoneDepths = true;
-
-    UPROPERTY(EditAnywhere, Category="Pose|ThoraxZones")
-    bool bDrawThoraxZoneDots = true;
-
-    UPROPERTY(EditAnywhere, Category="Pose|ThoraxZones")
-    FLinearColor ThoraxZoneDotColor = FLinearColor::White;
-
-    UPROPERTY(EditAnywhere, Category="Pose|ThoraxZones")
-    float ThoraxZoneDotSize = 8.0f;
-    
-    TArray<FThoraxZone> ThoraxZones;
-    
-    FVector2D ActiveThoraxMinUV = FVector2D::ZeroVector;
-
-    FVector2D ActiveThoraxMaxUV = FVector2D::ZeroVector;
-
-    bool bHasActiveThoraxBounds = false;
-
+    // ================= Sampling Internal State =================
     UPROPERTY(Transient)
     TObjectPtr<UDepthSampler> DepthSampler = nullptr;
 
-    float LastThoraxDepth = 0.0f;
+    UPROPERTY(EditAnywhere, Category="IOX|Sampling", meta=(AllowPrivateAccess="true"))
+    bool bUseFloat32DepthSampling = false;
 
-    bool bHasThoraxDepthReading = false;
+    UPROPERTY(EditAnywhere, Category="IOX|Sampling", meta=(AllowPrivateAccess="true"))
+    bool bUseDepthSampleConfidenceFilter = true;
 
-    UPROPERTY(EditAnywhere, Category="UI|DepthGraph", meta=(ClampMin="8", ClampMax="1000"))
+    UPROPERTY(EditAnywhere, Category="IOX|Sampling", meta=(AllowPrivateAccess="true", ClampMin="0.0", ClampMax="1.0"))
+    float MinDepthSampleConfidence = 0.45f;
+
+    UPROPERTY(EditAnywhere, Category="IOX|Sampling", meta=(AllowPrivateAccess="true"))
+    float MinJointConfidence = 0.05f;
+
+    UPROPERTY(EditAnywhere, Category="IOX|Sampling", meta=(AllowPrivateAccess="true"))
+    bool bFlipNormalizedJointY = true;
+
+    // ================= Thorax Zones & History =================
+    UPROPERTY(EditAnywhere, Category="IOX|Sampling", meta=(AllowPrivateAccess="true", ClampMin="1", ClampMax="10"))
+    int32 NumThoraxZones = 3;
+
+    UPROPERTY(EditAnywhere, Category="IOX|Sampling", meta=(AllowPrivateAccess="true"))
+    bool bLogThoraxZoneDepths = true;
+
+    UPROPERTY(EditAnywhere, Category="IOX|Sampling", meta=(AllowPrivateAccess="true", ClampMin="8", ClampMax="1000"))
     int32 ThoraxDepthHistoryMaxSamples = 700;
 
-    UPROPERTY(EditAnywhere, Category="UI|DepthGraph")
-    FName MainPanelDepthUpdateFunctionName = TEXT("UpdateThoraxDepthGraph");
-
-    UPROPERTY(EditAnywhere, Category="UI|DepthGraph")
+    UPROPERTY(EditAnywhere, Category="IOX|UI", meta=(AllowPrivateAccess="true"))
     bool bEnableThoraxDepthGraphUpdates = true;
 
+    UPROPERTY(EditAnywhere, Category="IOX|UI", meta=(AllowPrivateAccess="true"))
+    FName MainPanelDepthUpdateFunctionName = TEXT("UpdateThoraxDepthGraph");
+
+    TArray<FThoraxZone> ThoraxZones;
     TArray<float> ThoraxDepthHistory;
+    float LastThoraxDepth = 0.0f;
+    bool bHasThoraxDepthReading = false;
 
-    // ================= Sternum Sampling Overlay =================
-    UPROPERTY(EditAnywhere, Category="Overlay|Sternum")
-    TObjectPtr<UMaterialInterface> SternumAreaMaterial = nullptr;
+    FVector2D ActiveThoraxMinUV = FVector2D::ZeroVector;
+    FVector2D ActiveThoraxMaxUV = FVector2D::ZeroVector;
+    bool bHasActiveThoraxBounds = false;
 
-    UPROPERTY(EditAnywhere, Category="Overlay|Sternum")
-    bool bShowSternumSamplingArea = true;
-
-    UPROPERTY(EditAnywhere, Category="Overlay|Sternum")
-    FLinearColor SternumAreaFallbackColor = FLinearColor(1.0f, 0.1f, 0.1f, 0.25f);
-
-    UPROPERTY(EditAnywhere, Category="Overlay|Sternum")
-    FLinearColor SternumAreaOutlineColor = FLinearColor(1.0f, 0.1f, 0.1f, 0.9f);
-
-    UPROPERTY(EditAnywhere, Category="Overlay|Sternum", meta=(ClampMin="0.5", ClampMax="8.0"))
-    float SternumAreaOutlineThickness = 2.0f;
-
-    // Sternum
-    UPROPERTY(EditAnywhere, Category="UI|Sternum", meta=(ClampMin="0", ClampMax="1"))
-    float SternumAreaSize = 0.5f;
-
-    FVector2D ActiveSternumMinUV = FVector2D::ZeroVector;
-    FVector2D ActiveSternumMaxUV = FVector2D::ZeroVector;
-    bool bHasActiveSternumBounds = false;
-    float LastSternumDepth = 0.0f;
-    bool bHasSternumDepthReading = false;
-    TArray<float> SternumDepthHistory;
-    FHUDOverlayDrawer OverlayDrawer{this};
-
+    // ================= Volume Cache =================
     struct FCachedBreathVolume
     {
         int32 StartGlobalIndex = -1;
@@ -265,8 +187,16 @@ protected:
         bool bVolumeCalculated = false;
     };
 
+    TArray<FCachedBreathVolume> CachedBreathVolumes;
+    int32 ThoraxHistoryBaseSampleIndex = 0;
+    float AvgVolume = 0.0f;
 
-private:
+    UPROPERTY(EditAnywhere, Category="IOX|Sampling", meta=(AllowPrivateAccess="true", ClampMin="0", ClampMax="8"))
+    int32 BreathIndexMatchTolerance = 4;
+
+    FHUDOverlayDrawer OverlayDrawer{this};
+
+    // ================= Internal Methods =================
     void PushMaterialToWidget(TObjectPtr<UMaterialInterface> Material);
     void UpdateDepthWidgetState();
     void UpdateMainPanelState();
@@ -275,18 +205,6 @@ private:
     void UpdateMainPanelDepth();
 
     bool TryGetThoraxBoundsUV(const TArray<FPoseJoint>& Joints, FVector2D& OutMinUV, FVector2D& OutMaxUV) const;
-    bool TryGetSternumBoundsUV(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV, FVector2D& OutMinUV, FVector2D& OutMaxUV, float SternumAreaSize) const;
     void ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV);
     EThoraxJointRole ResolveThoraxJointRole(const FString& RawName) const;
-
-    float AvgVolume = 0.0f;
-
-    // Global index del primo campione mantenuto in ThoraxDepthHistory.
-    int32 ThoraxHistoryBaseSampleIndex = 0;
-
-    // Cache dei respiri finalizati
-    TArray<FCachedBreathVolume> CachedBreathVolumes;
-
-    UPROPERTY(EditAnywhere, Category="UI|DepthGraph", meta=(ClampMin="0", ClampMax="8"))
-    int32 BreathIndexMatchTolerance = 4;
 };

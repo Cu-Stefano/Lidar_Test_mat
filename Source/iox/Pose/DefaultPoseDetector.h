@@ -10,7 +10,7 @@
 #include "DefaultPoseDetector.generated.h"
 
 
-UCLASS()
+UCLASS(Blueprintable)
 class IOX_API UDefaultPoseDetector : public UObject, public IIPoseDetector
 {
 	GENERATED_BODY()

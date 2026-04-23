@@ -113,7 +113,7 @@ void UDefaultPoseDetector::SaveRenderTargetToPNG() const
     const int32 Width  = RenderTarget->SizeX;
     const int32 Height = RenderTarget->SizeY;
 
-    // Comprime in PNG con la nuova API
+    // Compresses to PNG using the new API
     TArray64<uint8> CompressedPNG;
     FImageUtils::PNGCompressImageArray(
         Width,

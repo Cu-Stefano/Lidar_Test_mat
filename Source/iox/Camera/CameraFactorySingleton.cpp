@@ -57,9 +57,11 @@ TScriptInterface<ICameraWithDepth> CameraFactorySingleton::CreateCameraByClass(T
 
     return Camera;
 }
-
 bool CameraFactorySingleton::IsTypeSupported(const FString& TypeName) const
 {
+    if (TypeName.Equals(TEXT("Unreal"), ESearchCase::IgnoreCase)) return true;
+    if (TypeName.Equals(TEXT("Mock"), ESearchCase::IgnoreCase)) return true;
+
     if (const UIOXSettings* Settings = UIOXSettings::Get())
     {
         return Settings->CameraClassMap.Contains(TypeName);
@@ -70,9 +72,15 @@ bool CameraFactorySingleton::IsTypeSupported(const FString& TypeName) const
 TArray<FString> CameraFactorySingleton::GetSupportedTypes()
 {
     TArray<FString> AllTypes;
+    AllTypes.Add(TEXT("Unreal"));
+    AllTypes.Add(TEXT("Mock"));
+
     if (const UIOXSettings* Settings = UIOXSettings::Get())
     {
-        Settings->CameraClassMap.GetKeys(AllTypes);
+        for (const auto& Pair : Settings->CameraClassMap)
+        {
+            AllTypes.AddUnique(Pair.Key);
+        }
     }
     return AllTypes;
 }

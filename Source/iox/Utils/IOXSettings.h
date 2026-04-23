@@ -25,6 +25,10 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Camera", meta=(DisplayName="Camera Class Map"))
 	TMap<FString, TSubclassOf<UObject>> CameraClassMap;
 
+	/** Map of pose detector type names to their corresponding Blueprint or C++ classes. */
+	UPROPERTY(Config, EditAnywhere, Category="Pose", meta=(DisplayName="Pose Class Map"))
+	TMap<FString, TSubclassOf<UObject>> PoseClassMap;
+
 	/** Gets the global IOX settings instance. */
 	static const UIOXSettings* Get() { return GetDefault<UIOXSettings>(); }
 };

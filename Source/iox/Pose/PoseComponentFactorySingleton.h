@@ -14,11 +14,13 @@ public:
     static PoseComponentFactorySingleton& GetInstance();
 
     TScriptInterface<IIPoseDetector> CreatePoseComponent(const FString& TypeName, TObjectPtr<AActor> Owner = nullptr);
+    
+    TScriptInterface<IIPoseDetector> CreatePoseComponentByClass(TSubclassOf<UObject> PoseClass, TObjectPtr<AActor> Owner = nullptr);
 
     bool IsTypeSupported(const FString& TypeName) const;
 
     static TArray<FString> GetSupportedTypes();
 
 private:
-    static const TArray<FString> SupportedPoseComponentTypes;
+
 };

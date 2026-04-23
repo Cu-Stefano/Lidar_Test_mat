@@ -14,4 +14,6 @@ namespace GraphMath
     };
 
     TArray<FBreathPoint> FindExtrema(const TArray<float>& XValues, const TArray<float>& YValues, float Prominence, int32 MinDistance);
-}   
+
+    TArray<float> SmoothArray(const TArray<float>& RawData, float Alpha);
+}

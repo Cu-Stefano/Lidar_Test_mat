@@ -19,6 +19,7 @@
 #include "Camera/DepthSampler.h"
 #include "Graph/GraphMath.h"
 #include "Math/NumericLimits.h"
+#include "Utils/IOXSettings.h"
 
 static const TMap<FString, EThoraxJointRole>& GetThoraxJointRoleDictionary()
 {
@@ -44,7 +45,7 @@ void AARHUD::BeginPlay()
 
     // Pose Component 
     PoseComponentFactorySingleton& PoseFactory = PoseComponentFactorySingleton::GetInstance();
-    PoseDetectorProvider = PoseFactory.CreatePoseComponent(TEXT("Default"), this);
+    PoseDetectorProvider = PoseFactory.CreatePoseComponent(PoseDetectorTypeName, this);
 
     if (!PoseDetectorProvider.GetObject())
     {
@@ -114,13 +115,6 @@ void AARHUD::GetThoraxDepthHistory(TArray<float>& OutHistory, float& OutLatestDe
     bOutHasDepth = bHasThoraxDepthReading;
 }
 
-void AARHUD::GetSternumDepthHistory(TArray<float>& OutHistory, float& OutLatestDepth, bool& bOutHasDepth) const
-{
-    OutHistory = SternumDepthHistory;
-    OutLatestDepth = LastSternumDepth;
-    bOutHasDepth = bHasSternumDepthReading;
-}
-
 void AARHUD::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
@@ -172,7 +166,6 @@ void AARHUD::Tick(float DeltaSeconds)
     {
         bHasThoraxDepthReading = false;
         bHasActiveThoraxBounds = false;
-        bHasActiveSternumBounds = false;
         UE_LOG(LogTemp, Warning, TEXT("Thorax depth mean skipped: PoseDetectorProvider not valid"));
         return;
     }
@@ -184,7 +177,6 @@ void AARHUD::Tick(float DeltaSeconds)
     {
         bHasThoraxDepthReading = false;
         bHasActiveThoraxBounds = false;
-        bHasActiveSternumBounds = false;
         UE_LOG(LogTemp, Warning, TEXT("Thorax depth mean skipped: full thorax bounds not available (need both shoulders and hips)"));
         return;
     }
@@ -192,15 +184,12 @@ void AARHUD::Tick(float DeltaSeconds)
     ActiveThoraxMinUV = ThoraxMinUV;
     ActiveThoraxMaxUV = ThoraxMaxUV;
 
-    bHasActiveSternumBounds = TryGetSternumBoundsUV(ActiveThoraxMinUV, ActiveThoraxMaxUV, ActiveSternumMinUV, ActiveSternumMaxUV, SternumAreaSize);
-
     bHasActiveThoraxBounds = true;
 
     TObjectPtr<UTexture> ConfidenceTexture = CameraWithDepth ? CameraWithDepth->GetConfidenceTexture() : nullptr;
     if (!DepthSampler || !DepthSampler->CaptureFrame(DepthMaterial, ConfidenceTexture, CameraRenderTarget, bUseFloat32DepthSampling))
     {
         bHasThoraxDepthReading = false;
-        bHasSternumDepthReading = false;
         UE_LOG(LogTemp, Warning, TEXT("Depth frame data capture failed"));
         return;
     }
@@ -235,7 +224,7 @@ void AARHUD::Tick(float DeltaSeconds)
 
     LastThoraxDepth = MeanDepthRaw;
     bHasThoraxDepthReading = true;
-    // Zone grid del torace
+    // Thorax zone grid
     ComputeThoraxZoneDepths(ThoraxMinUV, ThoraxMaxUV);
 
     RecordThoraxDepthSample(MeanDepthRaw);
@@ -256,31 +245,14 @@ void AARHUD::DrawHUD()
 {
     Super::DrawHUD();
 
-    OverlayDrawer.DrawDepthToggleButton();
     OverlayDrawer.DrawChestSamplingArea();
-    OverlayDrawer.DrawSternumArea();
-    OverlayDrawer.DrawThoraxZoneDots();
 
     if (!Canvas || !PoseDetectorProvider.GetObject())
     {
         return;
     }
 
-    if (bDrawJointDots || bDrawJointLabels)
-    {
-        OverlayDrawer.DrawJointsOverlay();
-    }
-}
 
-void AARHUD::NotifyHitBoxClick(FName BoxName)
-{
-    Super::NotifyHitBoxClick(BoxName);
-
-    if (BoxName == HUDConstants::DepthToggleHitBoxName)
-    {
-        bShowDepthOverlay = !bShowDepthOverlay;
-        UpdateDepthWidgetState();
-    }
 }
 
 bool AARHUD::TryGetThoraxBoundsUV(const TArray<FPoseJoint>& Joints, FVector2D& OutMinUV, FVector2D& OutMaxUV) const
@@ -376,24 +348,6 @@ bool AARHUD::TryGetThoraxBoundsUV(const TArray<FPoseJoint>& Joints, FVector2D& O
     return true;
 }
 
-bool AARHUD::TryGetSternumBoundsUV(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV, FVector2D& OutMinUV, FVector2D& OutMaxUV, float AreaSize) const
-{
-    const float ThoraxWidth = ThoraxMaxUV.X - ThoraxMinUV.X;
-    const float ThoraxHeight = ThoraxMaxUV.Y - ThoraxMinUV.Y;
-
-    const float SternumU = ThoraxMinUV.X + (ThoraxWidth * 0.5f);
-    const float SternumV = ThoraxMinUV.Y + (ThoraxHeight * 0.5f);
- 
-    const float BoxSize = ThoraxWidth * AreaSize;
-    const float HalfBoxSize = BoxSize * 0.5f;
-
-    OutMinUV.X = FMath::Clamp(SternumU - HalfBoxSize, 0.0f, 1.0f);
-    OutMinUV.Y = FMath::Clamp(SternumV - HalfBoxSize, 0.0f, 1.0f);
-    OutMaxUV.X = FMath::Clamp(SternumU + HalfBoxSize, 0.0f, 1.0f);
-    OutMaxUV.Y = FMath::Clamp(SternumV + HalfBoxSize, 0.0f, 1.0f);
-
-    return true;
-}
 
 void AARHUD::ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV)
 {
@@ -447,14 +401,18 @@ void AARHUD::ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxU
         }
     }
 
-
     if (bLogThoraxZoneDepths)
     {
         if (MainPanelWidget)
         {
             MainPanelWidget->UpdateTotalVolume(AvgVolume);
         }
-        UE_LOG(LogTemp, Log, TEXT("[ThoraxZones %dx%d Extrema | Total Volume: %.8f L]"), N, N, AvgVolume / 1000000.0f);   
+        
+        if (bLogThoraxDepthMean)
+        {
+            const int32 NT = FMath::Max(1, NumThoraxZones);
+            UE_LOG(LogTemp, Log, TEXT("[ThoraxZones %dx%d Mean Depth: %.2f mm | Total Volume: %.8f L]"), NT, NT, LastThoraxDepth, AvgVolume / 1000000.0f);
+        }
     }
 }
 
@@ -530,14 +488,13 @@ void AARHUD::RecordThoraxDepthSample(const float DepthUnits)
         ThoraxDepthHistory.RemoveAt(0, SamplesToTrim, EAllowShrinking::No);
         ThoraxHistoryBaseSampleIndex += SamplesToTrim;
 
-        // Prune respiri che non possono piu' essere rappresentati nella history corrente.
+        // Prune breaths that can no longer be represented in the current history.
         CachedBreathVolumes.RemoveAll([this](const FCachedBreathVolume& Breath)
         {
             return Breath.EndGlobalIndex < ThoraxHistoryBaseSampleIndex;
         });
     }
 }
-
 
 void AARHUD::UpdateMainPanelDepth()
 {
@@ -572,8 +529,8 @@ void AARHUD::UpdateMainPanelDepth()
 
     for (int32 PhaseIndex = 0; PhaseIndex < PhaseCount; ++PhaseIndex)
     {
-        const int32 StartIndex = ThoraxExtreme[PhaseIndex].Index; //inizio del (r/e)espiro
-        const int32 EndIndex = ThoraxExtreme[PhaseIndex + 1].Index; // fine (r/e)espiro
+        const int32 StartIndex = ThoraxExtreme[PhaseIndex].Index; // start of (r/e)espiration
+        const int32 EndIndex = ThoraxExtreme[PhaseIndex + 1].Index; // end of (r/e)espiration
 
         if (StartIndex < 0 || EndIndex < 0 || EndIndex <= StartIndex)
         {
@@ -583,7 +540,7 @@ void AARHUD::UpdateMainPanelDepth()
         const int32 StartGlobalIndex = BaseIndex + StartIndex;
         const int32 EndGlobalIndex = BaseIndex + EndIndex;
 
-        // L'ultima fase di (r/e)espirazione ancora "attiva" (sarebbe l'ultimo punto, la fase attuale).
+        // The last (r/e)espiration phase still "active" (would be the last point, the current phase).
         const bool bIsFinalizedPhase = (PhaseIndex < (PhaseCount - 1));
 
         int32 CachedIndex = INDEX_NONE;
@@ -635,7 +592,7 @@ void AARHUD::UpdateMainPanelDepth()
         }
     }
 
-    //media di TotalVolumes
+    // average of TotalVolumes appearing in the top right
     float Avg = 0.0f;
     for (const float Volume : TotalVolumes)
     {
@@ -667,4 +624,13 @@ FVector2D AARHUD::ToScreenSpace(float X, float Y) const
     }
 
     return FVector2D(ScreenX, ScreenY);
+}
+TArray<FString> AARHUD::GetCameraTypeOptions() const
+{
+    return CameraFactorySingleton::GetSupportedTypes();
+}
+
+TArray<FString> AARHUD::GetPoseDetectorOptions() const
+{
+    return PoseComponentFactorySingleton::GetSupportedTypes();
 }

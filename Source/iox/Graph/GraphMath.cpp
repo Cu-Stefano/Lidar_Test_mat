@@ -7,15 +7,15 @@ namespace GraphMath
     TArray<FBreathPoint> FindExtrema(
     const TArray<float>& XValues,
     const TArray<float>& YValues,
-    float Prominence,      // ampiezza
-    int32 MinDistance)     // frequenza minima
+    float Prominence,      // prominence
+    int32 MinDistance)     // min distance
 {
     TArray<FBreathPoint> Result;
 
     if (YValues.Num() < 3 || YValues.Num() != XValues.Num())
         return Result;
 
-    // Ampiezza totale per isolare le fluttuazioni microscopiche (noise)
+    // Total range to isolate microscopic fluctuations (noise)
     float YMin = YValues[0];
     float YMax = YValues[0];
     for (float Val : YValues)
@@ -46,7 +46,7 @@ namespace GraphMath
 
         if (bIsPeak && (i - LastPeakIndex) >= Window)
         {
-            // Verifica che il picco abbia sufficiente altezza (noise filter)
+            // Verify that the peak has sufficient height (noise filter)
             float LocalMin = YValues[i];
             for (int32 j = Left; j <= Right; j++) LocalMin = FMath::Min(LocalMin, YValues[j]);
             if (FMath::Abs(YValues[i] - LocalMin) >= AbsProminence)
@@ -62,7 +62,7 @@ namespace GraphMath
         }
         else if (bIsValley && (i - LastValleyIndex) >= Window)
         {
-            // Verifica che la valle abbia sufficiente profondità (noise filter)
+            // Verify that the valley has sufficient depth (noise filter)
             float LocalMax = YValues[i];
             for (int32 j = Left; j <= Right; j++) LocalMax = FMath::Max(LocalMax, YValues[j]);
             if (FMath::Abs(LocalMax - YValues[i]) >= AbsProminence)
@@ -79,6 +79,24 @@ namespace GraphMath
     }
 
     return Result;
+}
+
+TArray<float> SmoothArray(const TArray<float>& RawData, float Alpha)
+{
+    if (RawData.Num() == 0) return TArray<float>();
+    
+    TArray<float> SmoothedData;
+    SmoothedData.Reserve(RawData.Num());
+
+    float PreviousValue = RawData[0];
+    for (float Value : RawData)
+    {
+        float SmoothedValue = FMath::Lerp(PreviousValue, Value, Alpha);
+        SmoothedData.Add(SmoothedValue);
+        PreviousValue = SmoothedValue;
+    }
+
+    return SmoothedData;
 }
 }
 

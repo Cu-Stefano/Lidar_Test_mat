@@ -29,12 +29,8 @@ public:
     TArray<float> GetSmoothedHistory(float Alpha) const;
 
     TArray<GraphMath::FBreathPoint> ComputeExtrema(float SmoothingAlpha = 0.15f, float Prominence = 0.05f, int32 MinDistance = 30) const;
-
-    bool GetLastMaxMinBreath(float& OutMax, float& OutMin) const;
     
-    float GetRespirationVolume() const;
     float GetVolumeBetweenIndexes(int32 StartIndex, int32 EndIndex) const;
-    bool GetZoneDimensionsMM(float& OutWidthMM, float& OutHeightMM) const;
     
 private:
     FVector2D FocalLength = FVector2D::ZeroVector;

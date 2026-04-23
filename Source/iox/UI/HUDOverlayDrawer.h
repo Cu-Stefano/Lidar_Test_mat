@@ -13,14 +13,11 @@ namespace HUDConstants
 
 class FHUDOverlayDrawer
 {
+
 public:
     explicit FHUDOverlayDrawer(TObjectPtr<AARHUD> InHUD) : HUD(InHUD) {}
 
-    void DrawDepthToggleButton();
     void DrawChestSamplingArea();
-    void DrawSternumArea();
-    void DrawThoraxZoneDots();
-    void DrawJointsOverlay();
 
 private:
     TObjectPtr<AARHUD> HUD = nullptr;

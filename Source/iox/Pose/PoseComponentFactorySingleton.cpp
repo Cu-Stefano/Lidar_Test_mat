@@ -3,10 +3,8 @@
 
 #include "Pose/PoseComponentFactorySingleton.h"
 #include "Pose/DefaultPoseDetector.h"
+#include "Utils/IOXSettings.h"
 
-const TArray<FString> PoseComponentFactorySingleton::SupportedPoseComponentTypes = {
-    TEXT("Default"),
-};
 
 PoseComponentFactorySingleton& PoseComponentFactorySingleton::GetInstance()
 {
@@ -18,45 +16,81 @@ TScriptInterface<IIPoseDetector> PoseComponentFactorySingleton::CreatePoseCompon
 {
     TScriptInterface<IIPoseDetector> Result;
 
-    if (!IsTypeSupported(TypeName))
-    {
-        UE_LOG(LogTemp, Warning, TEXT("PoseComponentFactorySingleton: Unsupported pose component type '%s'"), *TypeName);
-        return Result;
-    }
-
     if (!Owner)
     {
         UE_LOG(LogTemp, Warning, TEXT("PoseComponentFactorySingleton: Owner is null, cannot create pose detector."));
         return Result;
     }
 
-    TObjectPtr<UDefaultPoseDetector> Component = NewObject<UDefaultPoseDetector>(
-        Owner,
-        UDefaultPoseDetector::StaticClass(),
-        TEXT("DefaultPoseDetector")
-    );
-
-    if (!Component)
+    // 1. Check Project Settings
+    if (const UIOXSettings* Settings = UIOXSettings::Get())
     {
-        UE_LOG(LogTemp, Warning, TEXT("PoseComponentFactorySingleton: Failed to create pose component of type '%s'"), *TypeName);
-        return Result;
+        if (const TSubclassOf<UObject>* ClassPtr = Settings->PoseClassMap.Find(TypeName))
+        {
+            if (*ClassPtr)
+            {
+                return CreatePoseComponentByClass(*ClassPtr, Owner);
+            }
+        }
     }
 
-    Result.SetObject(Component);
-    Result.SetInterface(Cast<IIPoseDetector>(Component));
+    // 2. Fallback to hardcoded default
+    if (TypeName.Equals(TEXT("Default"), ESearchCase::IgnoreCase))
+    {
+        TObjectPtr<UDefaultPoseDetector> Component = NewObject<UDefaultPoseDetector>(
+            Owner,
+            UDefaultPoseDetector::StaticClass(),
+            TEXT("DefaultPoseDetector")
+        );
 
-    UE_LOG(LogTemp, Log, TEXT("PoseComponentFactorySingleton: Created pose component of type '%s'"), *TypeName);
+        if (Component)
+        {
+            Result.SetObject(Component);
+            Result.SetInterface(Cast<IIPoseDetector>(Component));
+            return Result;
+        }
+    }
+
+    UE_LOG(LogTemp, Warning, TEXT("PoseComponentFactorySingleton: Unsupported pose component type '%s'"), *TypeName);
+    return Result;
+}
+
+TScriptInterface<IIPoseDetector> PoseComponentFactorySingleton::CreatePoseComponentByClass(TSubclassOf<UObject> PoseClass, TObjectPtr<AActor> Owner)
+{
+    TScriptInterface<IIPoseDetector> Result;
+    if (!PoseClass || !Owner) return Result;
+
+    UObject* NewDetector = NewObject<UObject>(Owner, PoseClass);
+    if (NewDetector && NewDetector->Implements<UIPoseDetector>())
+    {
+        Result.SetObject(NewDetector);
+        Result.SetInterface(Cast<IIPoseDetector>(NewDetector));
+    }
     return Result;
 }
 
 bool PoseComponentFactorySingleton::IsTypeSupported(const FString& TypeName) const
 {
-    return SupportedPoseComponentTypes.ContainsByPredicate([&TypeName](const FString& Type) {
-        return Type.Equals(TypeName, ESearchCase::IgnoreCase);
-    });
+    if (TypeName.Equals(TEXT("Default"), ESearchCase::IgnoreCase)) return true;
+
+    if (const UIOXSettings* Settings = UIOXSettings::Get())
+    {
+        return Settings->PoseClassMap.Contains(TypeName);
+    }
+    return false;
 }
 
 TArray<FString> PoseComponentFactorySingleton::GetSupportedTypes()
 {
-    return SupportedPoseComponentTypes;
+    TArray<FString> AllTypes;
+    AllTypes.Add(TEXT("Default"));
+
+    if (const UIOXSettings* Settings = UIOXSettings::Get())
+    {
+        for (const auto& Pair : Settings->PoseClassMap)
+        {
+            AllTypes.AddUnique(Pair.Key);
+        }
+    }
+    return AllTypes;
 }

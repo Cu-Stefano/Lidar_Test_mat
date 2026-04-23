@@ -3,7 +3,6 @@
 
 #include "Graph/UDepthGraphWidget.h"
 #include "Graph/GraphMath.h"
-#include "Graph/GraphUtils.h"
 
 #include "Fonts/SlateFontInfo.h"
 #include "Rendering/DrawElements.h"
@@ -210,7 +209,7 @@ int32 UDepthGraphWidget::NativePaint(
 	const float SmoothingAlpha = FMath::Clamp(DepthSmoothingAlpha, 0.01f, 1.0f);
 	if (bEnableDepthSmoothing)
 	{
-		SubArray = GraphUtils::SmoothArray(SubArray, SmoothingAlpha);
+		SubArray = GraphMath::SmoothArray(SubArray, SmoothingAlpha);
 	}
 	TArray<float> ScreenXs;
 	ScreenXs.Reserve(SamplesToDraw);
@@ -250,7 +249,7 @@ int32 UDepthGraphWidget::NativePaint(
 		LineThickness
 	);
 
-	// Disegno dei marcatori dei punti minimi e massimi
+	// Drawing min and max point markers
 	if (SubArray.Num() >= 3)
 	{
 		TArray<GraphMath::FBreathPoint> Extrema = GraphMath::FindExtrema(ScreenXs, SubArray, 0.05f, 30);
