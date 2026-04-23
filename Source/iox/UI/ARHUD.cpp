@@ -523,6 +523,13 @@ void AARHUD::RecordThoraxDepthSample(const float DepthUnits)
     {
         const int32 SamplesToTrim = ThoraxDepthHistory.Num() - MaxSamples;
         ThoraxDepthHistory.RemoveAt(0, SamplesToTrim, EAllowShrinking::No);
+        ThoraxHistoryBaseSampleIndex += SamplesToTrim;
+
+        // Prune respiri che non possono piu' essere rappresentati nella history corrente.
+        CachedBreathVolumes.RemoveAll([this](const FCachedBreathVolume& Breath)
+        {
+            return Breath.EndGlobalIndex < ThoraxHistoryBaseSampleIndex;
+        });
     }
 }
 
@@ -559,9 +566,8 @@ void AARHUD::UpdateMainPanelDepth()
     TArray<float> XValues;
     XValues.SetNum(ThoraxDepthHistory.Num());
     for (int32 i = 0; i < XValues.Num(); ++i) XValues[i] = (float)i;
-
     TArray<GraphMath::FBreathPoint> ThoraxExtreme = GraphMath::FindExtrema(XValues, ThoraxDepthHistory, 0.05f, 30);
-
+    
     if (ThoraxExtreme.Num() < 2)
     {
         MainPanelWidget->UpdateThoraxDepthGraph(ThoraxDepthHistory, TArray<float>(), LastThoraxDepth, bHasThoraxDepthReading);
@@ -572,14 +578,54 @@ void AARHUD::UpdateMainPanelDepth()
     TArray<float> TotalVolumes;
     TotalVolumes.SetNumZeroed(PhaseCount);
 
+    const int32 BaseIndex = ThoraxHistoryBaseSampleIndex;
+    const int32 IndexTolerance = FMath::Max(0, BreathIndexMatchTolerance);
+
     for (int32 PhaseIndex = 0; PhaseIndex < PhaseCount; ++PhaseIndex)
     {
-        const int32 StartIndex = ThoraxExtreme[PhaseIndex].Index;
-        const int32 EndIndex = ThoraxExtreme[PhaseIndex + 1].Index;
+        const int32 StartIndex = ThoraxExtreme[PhaseIndex].Index; //inizio del (r/e)espiro
+        const int32 EndIndex = ThoraxExtreme[PhaseIndex + 1].Index; // fine (r/e)espiro
 
         if (StartIndex < 0 || EndIndex < 0 || EndIndex <= StartIndex)
         {
             continue;
+        }
+
+        const int32 StartGlobalIndex = BaseIndex + StartIndex;
+        const int32 EndGlobalIndex = BaseIndex + EndIndex;
+
+        // L'ultima fase di (r/e)espirazione ancora "attiva" (sarebbe l'ultimo punto, la fase attuale).
+        const bool bIsFinalizedPhase = (PhaseIndex < (PhaseCount - 1));
+
+        int32 CachedIndex = INDEX_NONE;
+        if (bIsFinalizedPhase)
+        {
+            for (int32 i = 0; i < CachedBreathVolumes.Num(); ++i)
+            {
+                const FCachedBreathVolume& Cached = CachedBreathVolumes[i];
+                const int32 StartDistance = FMath::Abs(Cached.StartGlobalIndex - StartGlobalIndex);
+                const int32 EndDistance = FMath::Abs(Cached.EndGlobalIndex - EndGlobalIndex);
+
+                if (StartDistance <= IndexTolerance && EndDistance <= IndexTolerance)
+                {
+                    CachedIndex = i;
+                    break;
+                }
+            }
+
+            if (CachedIndex == INDEX_NONE)
+            {
+                FCachedBreathVolume NewBreath;
+                NewBreath.StartGlobalIndex = StartGlobalIndex;
+                NewBreath.EndGlobalIndex = EndGlobalIndex;
+                CachedIndex = CachedBreathVolumes.Add(NewBreath);
+            }
+
+            if (CachedBreathVolumes.IsValidIndex(CachedIndex) && CachedBreathVolumes[CachedIndex].bVolumeCalculated)
+            {
+                TotalVolumes[PhaseIndex] = CachedBreathVolumes[CachedIndex].VolumeMm3;
+                continue;
+            }
         }
 
         float PhaseVolume = 0.0f;
@@ -589,6 +635,15 @@ void AARHUD::UpdateMainPanelDepth()
         }
 
         TotalVolumes[PhaseIndex] = PhaseVolume;
+
+        if (bIsFinalizedPhase && CachedBreathVolumes.IsValidIndex(CachedIndex))
+        {
+            FCachedBreathVolume& Cached = CachedBreathVolumes[CachedIndex];
+            Cached.StartGlobalIndex = StartGlobalIndex;
+            Cached.EndGlobalIndex = EndGlobalIndex;
+            Cached.VolumeMm3 = PhaseVolume;
+            Cached.bVolumeCalculated = true;
+        }
     }
 
     //media di TotalVolumes

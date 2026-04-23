@@ -260,6 +260,14 @@ protected:
     TArray<float> SternumDepthHistory;
     FHUDOverlayDrawer OverlayDrawer{this};
 
+    struct FCachedBreathVolume
+    {
+        int32 StartGlobalIndex = -1;
+        int32 EndGlobalIndex = -1;
+        float VolumeMm3 = 0.0f;
+        bool bVolumeCalculated = false;
+    };
+
 private:
     void ValidateEditorAssignments() const;
     void PushMaterialToWidget(TObjectPtr<UMaterialInterface> Material);
@@ -291,4 +299,13 @@ private:
     EThoraxJointRole ResolveThoraxJointRole(const FString& RawName) const;
 
     float AvgVolume = 0.0f;
+
+    // Global index del primo campione mantenuto in ThoraxDepthHistory.
+    int32 ThoraxHistoryBaseSampleIndex = 0;
+
+    // Cache dei respiri finalizati
+    TArray<FCachedBreathVolume> CachedBreathVolumes;
+
+    UPROPERTY(EditAnywhere, Category="UI|DepthGraph", meta=(ClampMin="0", ClampMax="8"))
+    int32 BreathIndexMatchTolerance = 4;
 };
