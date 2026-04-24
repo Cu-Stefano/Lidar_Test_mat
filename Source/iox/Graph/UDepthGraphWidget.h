@@ -28,7 +28,7 @@ class IOX_API UDepthGraphWidget : public UUserWidget
 
 public:
 	UFUNCTION(BlueprintCallable, Category="Depth Graph")
-	void SetGraphData(const TArray<float>& InDepthHistory, const TArray<float>& TotalVolumes, const float InCurrentDepth, const bool bInHasDepth);
+	void SetGraphData(const TArray<float>& InDepthHistory, const TArray<FDateTime>& InTimeHistory, const TArray<float>& TotalVolumes, const float InCurrentDepth, const bool bInHasDepth);
 
 	const TArray<FDepthGraphExtremaSample>& GetExtremaHistory() const
 	{
@@ -49,7 +49,7 @@ protected:
 	) const override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|Style")
-	FMargin GraphPadding = FMargin(12.0f, 12.0f, 12.0f, 12.0f);
+	FMargin GraphPadding = FMargin(12.0f, 12.0f, 12.0f, 24.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|Style")
 	FLinearColor BackgroundColor = FLinearColor(0.03f, 0.03f, 0.03f, 0.70f);
@@ -101,6 +101,9 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, Category="Depth Graph|Data")
 	TArray<float> DepthHistory;
+
+	UPROPERTY(BlueprintReadOnly, Category="Depth Graph|Data")
+	TArray<FDateTime> TimeHistory;
 
 	UPROPERTY(BlueprintReadOnly, Category="Depth Graph|Data")
 	float CurrentDepth = 0.0f;

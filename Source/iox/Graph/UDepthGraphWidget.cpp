@@ -12,9 +12,10 @@
 #include "Rendering/SlateLayoutTransform.h"
 #include "Math/NumericLimits.h"
 
-void UDepthGraphWidget::SetGraphData(const TArray<float>& InDepthHistory, const TArray<float>& TotalVolumes, const float InCurrentDepth, const bool bInHasDepth)
+void UDepthGraphWidget::SetGraphData(const TArray<float>& InDepthHistory, const TArray<FDateTime>& InTimeHistory, const TArray<float>& TotalVolumes, const float InCurrentDepth, const bool bInHasDepth)
 {
 	DepthHistory = InDepthHistory;
+	TimeHistory = InTimeHistory;
 	VolumeLabels = TotalVolumes;
 	CurrentDepth = InCurrentDepth;
 	bHasDepth = bInHasDepth;
@@ -157,7 +158,7 @@ int32 UDepthGraphWidget::NativePaint(
 
 	const auto DrawYAxisLabel = [&](const int32 Layer, const float Y, const float DepthValue)
 	{
-		const FString Label = FString::Printf(TEXT("%.3f"), DepthValue);
+		const FString Label = FString::Printf(TEXT("%.0f"), DepthValue);
 		const FVector2f LabelPosition(
 			static_cast<float>(AxisTextX),
 			static_cast<float>(Y - 7.0f)
@@ -195,6 +196,42 @@ int32 UDepthGraphWidget::NativePaint(
 	DrawYAxisLabel(BaseLayer + 3, Top, MinDepth);
 	DrawYAxisLabel(BaseLayer + 3, Top + 0.5f * PlotHeight, MidDepth);
 	DrawYAxisLabel(BaseLayer + 3, Bottom, MaxDepth);
+
+	const auto DrawXAxisLabel = [&](const int32 Layer, const float X, const FDateTime& Time)
+	{
+		const FString Label = Time.ToString(TEXT("%H:%M:%S"));
+		const FVector2f LabelPosition(
+			static_cast<float>(X - 30.0f),
+			static_cast<float>(Bottom + 2.0f)
+		);
+
+		FSlateDrawElement::MakeText(
+			OutDrawElements,
+			Layer,
+			AllottedGeometry.ToPaintGeometry(
+				FVector2f(100.0f, 20.0f),
+				FSlateLayoutTransform(LabelPosition)
+			),
+			Label,
+			AxisFontInfo,
+			ESlateDrawEffect::None,
+			AxisLabelColor
+		);
+	};
+
+	if (TimeHistory.Num() >= 2)
+	{
+		const int32 T_TotalSamples = TimeHistory.Num();
+		const int32 T_SamplesToDraw = FMath::Min(T_TotalSamples, MaxSamples);
+		const int32 T_StartIndex = T_TotalSamples - T_SamplesToDraw;
+
+		// Left time label
+		DrawXAxisLabel(BaseLayer + 3, Left + 30.0f, TimeHistory[T_StartIndex]);
+		// Middle label
+		DrawXAxisLabel(BaseLayer + 3, Left + 0.5f * PlotWidth, TimeHistory[T_StartIndex + T_SamplesToDraw / 2]);
+		// Right time label
+		DrawXAxisLabel(BaseLayer + 3, Right - 30.0f, TimeHistory.Last());
+	}
 
 	TArray<FVector2D> GraphPoints;
 	GraphPoints.Reserve(SamplesToDraw);

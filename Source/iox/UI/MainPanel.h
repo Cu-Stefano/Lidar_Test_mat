@@ -23,7 +23,7 @@ public:
     TObjectPtr<UTextBlock> Volume;
 
 	UFUNCTION(BlueprintCallable, Category="UI|MainPanel")
-	void UpdateThoraxDepthGraph(const TArray<float>& History, const TArray<float>& TotalVolumes, float LatestDepth, bool bHasDepth);
+	void UpdateThoraxDepthGraph(const TArray<float>& History, const TArray<FDateTime>& TimeHistory, const TArray<float>& TotalVolumes, float LatestDepth, bool bHasDepth);
 
     UFUNCTION(BlueprintCallable, Category="UI|MainPanel")
     void UpdateTotalVolume(float TotalVolume);

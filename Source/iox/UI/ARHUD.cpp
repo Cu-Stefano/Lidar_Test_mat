@@ -480,12 +480,14 @@ void AARHUD::RecordThoraxDepthSample(const float DepthUnits)
     }
 
     ThoraxDepthHistory.Add(DepthUnits);
+    ThoraxDepthTimeHistory.Add(FDateTime::Now());
 
     const int32 MaxSamples = FMath::Max(1, ThoraxDepthHistoryMaxSamples);
     if (ThoraxDepthHistory.Num() > MaxSamples)
     {
         const int32 SamplesToTrim = ThoraxDepthHistory.Num() - MaxSamples;
         ThoraxDepthHistory.RemoveAt(0, SamplesToTrim, EAllowShrinking::No);
+        ThoraxDepthTimeHistory.RemoveAt(0, SamplesToTrim, EAllowShrinking::No);
         ThoraxHistoryBaseSampleIndex += SamplesToTrim;
 
         // Prune breaths that can no longer be represented in the current history.
@@ -516,7 +518,7 @@ void AARHUD::UpdateMainPanelDepth()
     
     if (ThoraxExtreme.Num() < 2)
     {
-        MainPanelWidget->UpdateThoraxDepthGraph(ThoraxDepthHistory, TArray<float>(), LastThoraxDepth, bHasThoraxDepthReading);
+        MainPanelWidget->UpdateThoraxDepthGraph(ThoraxDepthHistory, ThoraxDepthTimeHistory, TArray<float>(), LastThoraxDepth, bHasThoraxDepthReading);
         return;
     }
 
@@ -604,7 +606,7 @@ void AARHUD::UpdateMainPanelDepth()
     }
     AvgVolume = Avg;
 
-    MainPanelWidget->UpdateThoraxDepthGraph(ThoraxDepthHistory, TotalVolumes, LastThoraxDepth, bHasThoraxDepthReading);
+    MainPanelWidget->UpdateThoraxDepthGraph(ThoraxDepthHistory, ThoraxDepthTimeHistory, TotalVolumes, LastThoraxDepth, bHasThoraxDepthReading);
 }
 
 FVector2D AARHUD::ToScreenSpace(float X, float Y) const

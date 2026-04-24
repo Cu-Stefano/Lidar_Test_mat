@@ -171,6 +171,7 @@ private:
 
     TArray<FThoraxZone> ThoraxZones;
     TArray<float> ThoraxDepthHistory;
+    TArray<FDateTime> ThoraxDepthTimeHistory;
     float LastThoraxDepth = 0.0f;
     bool bHasThoraxDepthReading = false;
 

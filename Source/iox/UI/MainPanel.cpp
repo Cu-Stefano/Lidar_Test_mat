@@ -6,9 +6,9 @@
 #include "Components/TextBlock.h"
 
 
-void UMainPanel::UpdateThoraxDepthGraph(const TArray<float>& History, const TArray<float>& TotalVolumes, float LatestDepth, bool bHasDepth)
+void UMainPanel::UpdateThoraxDepthGraph(const TArray<float>& History, const TArray<FDateTime>& TimeHistory, const TArray<float>& TotalVolumes, float LatestDepth, bool bHasDepth)
 {
-    WBPDepthGraph->SetGraphData(History, TotalVolumes, LatestDepth, bHasDepth);
+    WBPDepthGraph->SetGraphData(History, TimeHistory, TotalVolumes, LatestDepth, bHasDepth);
 }
 
 void UMainPanel::UpdateTotalVolume(float InTotalVolume)
