@@ -26,8 +26,6 @@ public:
 
     void AddDepthSample(float Depth, int32 MaxSamples);
 
-    TArray<float> GetSmoothedHistory(float Alpha) const;
-
     TArray<GraphMath::FBreathPoint> ComputeExtrema(float SmoothingAlpha = 0.15f, float Prominence = 0.05f, int32 MinDistance = 30) const;
     
     float GetVolumeBetweenIndexes(int32 StartIndex, int32 EndIndex) const;

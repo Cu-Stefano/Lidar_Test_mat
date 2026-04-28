@@ -22,7 +22,10 @@ public class iox : ModuleRules
             "ImageWrapper",
             "RenderCore",
             "RHI",
-            "DeveloperSettings"
+            "DeveloperSettings",
+            "Http",
+            "Json",
+            "JsonUtilities"
         });
 
         PrivateDependencyModuleNames.AddRange(new string[] {

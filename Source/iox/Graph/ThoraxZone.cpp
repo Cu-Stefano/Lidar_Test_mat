@@ -45,11 +45,6 @@ void FThoraxZone::AddDepthSample(float Depth, int32 MaxSamples)
     }
 }
 
-TArray<float> FThoraxZone::GetSmoothedHistory(float Alpha) const
-{
-    return GraphMath::SmoothArray(DepthHistory, Alpha);
-}
-
 TArray<GraphMath::FBreathPoint> FThoraxZone::ComputeExtrema(float SmoothingAlpha, float Prominence, int32 MinDistance) const
 {
     if (DepthHistory.Num() < 3) 
@@ -57,7 +52,7 @@ TArray<GraphMath::FBreathPoint> FThoraxZone::ComputeExtrema(float SmoothingAlpha
         return {};
     }
 
-    const TArray<float> YValues = GetSmoothedHistory(SmoothingAlpha);
+    const TArray<float> YValues = DepthHistory;
     
     TArray<float> XValues;
     XValues.SetNum(YValues.Num());

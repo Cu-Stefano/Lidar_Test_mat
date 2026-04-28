@@ -7,9 +7,9 @@
 #include "UObject/ScriptInterface.h"
 #include "Camera/ICameraWithDepth.h"
 #include "Pose/IPoseDetector.h"
-#include "Utils/Constants.h"
 #include "UI/HUDOverlayDrawer.h"
 #include "Graph/ThoraxZone.h"
+#include "Utils/SessionData.h"
 #include "ARHUD.generated.h"
 
 enum class EThoraxJointRole : uint8
@@ -40,9 +40,14 @@ class IOX_API AARHUD : public AHUD
 public:
     AARHUD();
 
-    /** API for UI or external systems to get the current thorax data. */
     UFUNCTION(BlueprintCallable, Category="IOX|DepthGraph")
     void GetThoraxDepthHistory(TArray<float>& OutHistory, float& OutLatestDepth, bool& bOutHasDepth) const;
+
+    UFUNCTION(BlueprintCallable, CallInEditor, Category="IOX|Session")
+    void ToggleRecording();
+
+    UFUNCTION(BlueprintPure, Category="IOX|Session")
+    bool IsRecording() const { return bIsRecording; }
 
 protected:
     virtual void BeginPlay() override;
@@ -191,6 +196,10 @@ private:
     TArray<FCachedBreathVolume> CachedBreathVolumes;
     int32 ThoraxHistoryBaseSampleIndex = 0;
     float AvgVolume = 0.0f;
+
+    // ================= Session Recording =================
+    bool bIsRecording = false;
+    FBreathingSessionData CurrentSession;
 
     UPROPERTY(EditAnywhere, Category="IOX|Sampling", meta=(AllowPrivateAccess="true", ClampMin="0", ClampMax="8"))
     int32 BreathIndexMatchTolerance = 4;

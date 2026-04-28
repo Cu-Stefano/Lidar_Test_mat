@@ -20,6 +20,7 @@
 #include "Graph/GraphMath.h"
 #include "Math/NumericLimits.h"
 #include "Utils/IOXSettings.h"
+#include "Utils/SessionExporter.h"
 
 static const TMap<FString, EThoraxJointRole>& GetThoraxJointRoleDictionary()
 {
@@ -93,6 +94,7 @@ void AARHUD::BeginPlay()
         if (MainPanelWidget)
         {
             MainPanelWidget->AddToViewport(5);
+            MainPanelWidget->OnStartRecRequested.AddDynamic(this, &AARHUD::ToggleRecording);
         }
     }
 
@@ -479,8 +481,26 @@ void AARHUD::RecordThoraxDepthSample(const float DepthUnits)
         return;
     }
 
-    ThoraxDepthHistory.Add(DepthUnits);
+    // Apply incremental smoothing (exponential moving average) with alpha=0.2f
+    const float SmoothingAlpha = 0.2f;
+    float SmoothedValue = (ThoraxDepthHistory.Num() > 0) 
+        ? (SmoothingAlpha * DepthUnits + (1.0f - SmoothingAlpha) * ThoraxDepthHistory.Last())
+        : DepthUnits;
+
+    ThoraxDepthHistory.Add(SmoothedValue);
     ThoraxDepthTimeHistory.Add(FDateTime::Now());
+
+    if (bIsRecording)
+    {
+        // inverted so that it looks morte natural and like the actual graph
+        // Use smoothed value (negative for UI convention)
+        CurrentSession.Values.Add(-SmoothedValue);
+        
+        FDateTime Now = FDateTime::Now();
+        FString TimeLabel = FString::Printf(TEXT("%02d:%02d:%02d:%03d"), 
+            Now.GetHour(), Now.GetMinute(), Now.GetSecond(), Now.GetMillisecond());
+        CurrentSession.Labels.Add(TimeLabel);
+    }
 
     const int32 MaxSamples = FMath::Max(1, ThoraxDepthHistoryMaxSamples);
     if (ThoraxDepthHistory.Num() > MaxSamples)
@@ -591,6 +611,32 @@ void AARHUD::UpdateMainPanelDepth()
             Cached.EndGlobalIndex = EndGlobalIndex;
             Cached.VolumeMm3 = PhaseVolume;
             Cached.bVolumeCalculated = true;
+
+            if (bIsRecording)
+            {
+                // Find if this extremum is within the current recording session
+                // We map global index to session index
+                int32 SessionStartIndex = ThoraxHistoryBaseSampleIndex + ThoraxDepthHistory.Num() - CurrentSession.Values.Num();
+                int32 SessionIndex = EndGlobalIndex - SessionStartIndex;
+
+                if (SessionIndex >= 0 && SessionIndex < CurrentSession.Values.Num())
+                {
+                    // Check if we already have an annotation for this index
+                    bool bAlreadyAnnotated = false;
+                    for (const auto& Ann : CurrentSession.Annotations)
+                    {
+                        if (Ann.Index == SessionIndex) { bAlreadyAnnotated = true; break; }
+                    }
+
+                    if (!bAlreadyAnnotated)
+                    {
+                        FBreathingAnnotation Ann;
+                        Ann.Index = SessionIndex;
+                        Ann.Label = FString::Printf(TEXT("%.2f L"), PhaseVolume / 1000000.0f);
+                        CurrentSession.Annotations.Add(Ann);
+                    }
+                }
+            }
         }
     }
 
@@ -635,4 +681,21 @@ TArray<FString> AARHUD::GetCameraTypeOptions() const
 TArray<FString> AARHUD::GetPoseDetectorOptions() const
 {
     return PoseComponentFactorySingleton::GetSupportedTypes();
+}
+
+void AARHUD::ToggleRecording()
+{
+    bIsRecording = !bIsRecording;
+    if (bIsRecording)
+    {
+        CurrentSession.Reset();
+        CurrentSession.Title = TEXT("Monitoraggio Respiro");
+        CurrentSession.Description = FString::Printf(TEXT("Dati catturati il %s"), *FDateTime::Now().ToString());
+        UE_LOG(LogTemp, Log, TEXT("Inizio registrazione sessione respiro..."));
+    }
+    else
+    {
+        UE_LOG(LogTemp, Log, TEXT("Fine registrazione sessione respiro. Campioni: %d, Annotazioni: %d"), CurrentSession.Values.Num(), CurrentSession.Annotations.Num());
+        USessionExporter::ExportSession(this, CurrentSession);
+    }
 }

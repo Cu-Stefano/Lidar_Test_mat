@@ -199,7 +199,8 @@ int32 UDepthGraphWidget::NativePaint(
 
 	const auto DrawXAxisLabel = [&](const int32 Layer, const float X, const FDateTime& Time)
 	{
-		const FString Label = Time.ToString(TEXT("%H:%M:%S"));
+		const FString Label = FString::Printf(TEXT("%02d:%02d:%02d:%03d"), 
+			Time.GetHour(), Time.GetMinute(), Time.GetSecond(), Time.GetMillisecond());
 		const FVector2f LabelPosition(
 			static_cast<float>(X - 30.0f),
 			static_cast<float>(Bottom + 2.0f)
