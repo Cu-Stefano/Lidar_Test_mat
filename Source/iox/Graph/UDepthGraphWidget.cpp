@@ -35,14 +35,6 @@ void UDepthGraphWidget::SetGraphData(const TArray<float>& InMeanHistory, const T
 	CurrentDepth = InLastAvgVolume / 1000000.0f;
 	bHasDepth = DepthHistory.Num() > 0;
 
-	// hard code here the values just for the Voluyme mean
-	MinYAxisClamp = 3.0f; 
-	MaxYAxisClamp = 0.1f; 
-	FixedYRangePadding = 0.8f; 
-	SamplesForMinMaxCalculation = 150; 
-	bShowVolumeOnExtrema = false;
-	YAxisUnitLabel = TEXT("Liters");
-
 	InvalidateLayoutAndVolatility();
 }
 
