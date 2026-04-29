@@ -1,6 +1,5 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "Graph/UDepthGraphWidget.h"
 #include "Graph/GraphMath.h"
 
@@ -19,6 +18,30 @@ void UDepthGraphWidget::SetGraphData(const TArray<float>& InDepthHistory, const 
 	VolumeLabels = TotalVolumes;
 	CurrentDepth = InCurrentDepth;
 	bHasDepth = bInHasDepth;
+
+	InvalidateLayoutAndVolatility();
+}
+
+void UDepthGraphWidget::SetGraphData(const TArray<float>& InMeanHistory, const TArray<FDateTime>& InTimeHistory, const float InLastAvgVolume)
+{
+	DepthHistory.Reset();
+	DepthHistory.Reserve(InMeanHistory.Num());
+	for (const float Value : InMeanHistory)
+	{
+		DepthHistory.Add(Value / 1000000.0f);
+	}
+	TimeHistory = InTimeHistory;
+	VolumeLabels.Empty();
+	CurrentDepth = InLastAvgVolume / 1000000.0f;
+	bHasDepth = DepthHistory.Num() > 0;
+
+	// hard code here the values just for the Voluyme mean
+	MinYAxisClamp = 3.0f; 
+	MaxYAxisClamp = 0.1f; 
+	FixedYRangePadding = 0.8f; 
+	SamplesForMinMaxCalculation = 150; 
+	bShowVolumeOnExtrema = false;
+	YAxisUnitLabel = TEXT("Liters");
 
 	InvalidateLayoutAndVolatility();
 }

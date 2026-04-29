@@ -176,6 +176,7 @@ private:
 
     TArray<FThoraxZone> ThoraxZones;
     TArray<float> ThoraxDepthHistory;
+    TArray<float> VolumeMeanHistory;
     TArray<FDateTime> ThoraxDepthTimeHistory;
     float LastThoraxDepth = 0.0f;
     bool bHasThoraxDepthReading = false;
@@ -195,7 +196,7 @@ private:
 
     TArray<FCachedBreathVolume> CachedBreathVolumes;
     int32 ThoraxHistoryBaseSampleIndex = 0;
-    float AvgVolume = 0.0f;
+    float LastAvgVolume = 0.0f;
 
     // ================= Session Recording =================
     bool bIsRecording = false;
@@ -217,4 +218,5 @@ private:
     bool TryGetThoraxBoundsUV(const TArray<FPoseJoint>& Joints, FVector2D& OutMinUV, FVector2D& OutMaxUV) const;
     void ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxUV);
     EThoraxJointRole ResolveThoraxJointRole(const FString& RawName) const;
+    void ComputeAndCacheThoraxPhaseVolumes(const TArray<GraphMath::FBreathPoint>& ThoraxExtreme, TArray<float>& OutTotalVolumes);
 };

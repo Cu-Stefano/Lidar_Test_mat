@@ -7,9 +7,20 @@
 #include "Components/Button.h"
 
 
-void UMainPanel::UpdateThoraxDepthGraph(const TArray<float>& History, const TArray<FDateTime>& TimeHistory, const TArray<float>& TotalVolumes, float LatestDepth, bool bHasDepth)
+void UMainPanel::UpdateThoraxDepthGraph(const TArray<float>& History, const TArray<FDateTime>& TimeHistory,  const TArray<float>& TotalVolumes, float LatestDepth, bool bHasDepth)
 {
-    WBPDepthGraph->SetGraphData(History, TimeHistory, TotalVolumes, LatestDepth, bHasDepth);
+    if (WBPDepthGraph)
+    {
+        WBPDepthGraph->SetGraphData(History, TimeHistory, TotalVolumes, LatestDepth, bHasDepth);
+    }
+}
+
+void UMainPanel::UpdateMeanVolumeGraph(const TArray<float>& VolumeMeanHistory, const TArray<FDateTime>& TimeHistory, float LastAvgVolume)
+{
+    if (WBPVolumeMeanGraph)
+    {
+        WBPVolumeMeanGraph->SetGraphData(VolumeMeanHistory, TimeHistory, LastAvgVolume);
+    }
 }
 
 void UMainPanel::UpdateTotalVolume(float InTotalVolume)

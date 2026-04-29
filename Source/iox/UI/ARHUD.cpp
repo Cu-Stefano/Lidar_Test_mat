@@ -402,20 +402,6 @@ void AARHUD::ComputeThoraxZoneDepths(FVector2D ThoraxMinUV, FVector2D ThoraxMaxU
             }
         }
     }
-
-    if (bLogThoraxZoneDepths)
-    {
-        if (MainPanelWidget)
-        {
-            MainPanelWidget->UpdateTotalVolume(AvgVolume);
-        }
-        
-        if (bLogThoraxDepthMean)
-        {
-            const int32 NT = FMath::Max(1, NumThoraxZones);
-            UE_LOG(LogTemp, Log, TEXT("[ThoraxZones %dx%d Mean Depth: %.2f mm | Total Volume: %.8f L]"), NT, NT, LastThoraxDepth, AvgVolume / 1000000.0f);
-        }
-    }
 }
 
 void AARHUD::PushMaterialToWidget(TObjectPtr<UMaterialInterface> Material)
@@ -518,33 +504,10 @@ void AARHUD::RecordThoraxDepthSample(const float DepthUnits)
     }
 }
 
-void AARHUD::UpdateMainPanelDepth()
+void AARHUD::ComputeAndCacheThoraxPhaseVolumes(const TArray<GraphMath::FBreathPoint>& ThoraxExtreme, TArray<float>& OutTotalVolumes)
 {
-    if (!bEnableThoraxDepthGraphUpdates || !MainPanelWidget || ThoraxDepthHistory.Num() < 3)
-    {
-        return;
-    }
-
-    if (ThoraxZones.Num() == 0)
-    {
-        return;
-    }
-
-    // Find global extrema on thorax history.
-    TArray<float> XValues;
-    XValues.SetNum(ThoraxDepthHistory.Num());
-    for (int32 i = 0; i < XValues.Num(); ++i) XValues[i] = (float)i;
-    TArray<GraphMath::FBreathPoint> ThoraxExtreme = GraphMath::FindExtrema(XValues, ThoraxDepthHistory, 0.05f, 30);
-    
-    if (ThoraxExtreme.Num() < 2)
-    {
-        MainPanelWidget->UpdateThoraxDepthGraph(ThoraxDepthHistory, ThoraxDepthTimeHistory, TArray<float>(), LastThoraxDepth, bHasThoraxDepthReading);
-        return;
-    }
-
     const int32 PhaseCount = ThoraxExtreme.Num() - 1;
-    TArray<float> TotalVolumes;
-    TotalVolumes.SetNumZeroed(PhaseCount);
+    OutTotalVolumes.SetNumZeroed(PhaseCount);
 
     const int32 BaseIndex = ThoraxHistoryBaseSampleIndex;
     const int32 IndexTolerance = FMath::Max(0, BreathIndexMatchTolerance);
@@ -591,7 +554,7 @@ void AARHUD::UpdateMainPanelDepth()
 
             if (CachedBreathVolumes.IsValidIndex(CachedIndex) && CachedBreathVolumes[CachedIndex].bVolumeCalculated)
             {
-                TotalVolumes[PhaseIndex] = CachedBreathVolumes[CachedIndex].VolumeMm3;
+                OutTotalVolumes[PhaseIndex] = CachedBreathVolumes[CachedIndex].VolumeMm3;
                 continue;
             }
         }
@@ -602,7 +565,7 @@ void AARHUD::UpdateMainPanelDepth()
             PhaseVolume += Zone.GetVolumeBetweenIndexes(StartIndex, EndIndex);
         }
 
-        TotalVolumes[PhaseIndex] = PhaseVolume;
+        OutTotalVolumes[PhaseIndex] = PhaseVolume;
 
         if (bIsFinalizedPhase && CachedBreathVolumes.IsValidIndex(CachedIndex))
         {
@@ -639,6 +602,34 @@ void AARHUD::UpdateMainPanelDepth()
             }
         }
     }
+}
+
+void AARHUD::UpdateMainPanelDepth()
+{
+    if (!bEnableThoraxDepthGraphUpdates || !MainPanelWidget || ThoraxDepthHistory.Num() < 3)
+    {
+        return;
+    }
+
+    if (ThoraxZones.Num() == 0)
+    {
+        return;
+    }
+
+    // Find global extrema on thorax history.
+    TArray<float> XValues;
+    XValues.SetNum(ThoraxDepthHistory.Num());
+    for (int32 i = 0; i < XValues.Num(); ++i) XValues[i] = (float)i;
+    TArray<GraphMath::FBreathPoint> ThoraxExtreme = GraphMath::FindExtrema(XValues, ThoraxDepthHistory, 0.05f, 30);
+    
+    if (ThoraxExtreme.Num() < 2)
+    {
+        MainPanelWidget->UpdateThoraxDepthGraph(ThoraxDepthHistory, ThoraxDepthTimeHistory, TArray<float>(), LastThoraxDepth, bHasThoraxDepthReading);
+        return;
+    }
+
+    TArray<float> TotalVolumes;
+    ComputeAndCacheThoraxPhaseVolumes(ThoraxExtreme, TotalVolumes);
 
     // average of TotalVolumes appearing in the top right
     float Avg = 0.0f;
@@ -650,9 +641,25 @@ void AARHUD::UpdateMainPanelDepth()
     {
         Avg /= TotalVolumes.Num();
     }
-    AvgVolume = Avg;
+    LastAvgVolume = Avg;
+    VolumeMeanHistory.Add(LastAvgVolume);
+
+    if (bLogThoraxZoneDepths)
+    {
+        if (MainPanelWidget)
+        {
+            MainPanelWidget->UpdateTotalVolume(LastAvgVolume);
+        }
+        
+        if (bLogThoraxDepthMean)
+        {
+            const int32 NT = FMath::Max(1, NumThoraxZones);
+            UE_LOG(LogTemp, Log, TEXT("[ThoraxZones %dx%d Mean Depth: %.2f mm | Total Volume: %.8f L]"), NT, NT, LastThoraxDepth, LastAvgVolume / 1000000.0f);
+        }
+    }
 
     MainPanelWidget->UpdateThoraxDepthGraph(ThoraxDepthHistory, ThoraxDepthTimeHistory, TotalVolumes, LastThoraxDepth, bHasThoraxDepthReading);
+    MainPanelWidget->UpdateMeanVolumeGraph(VolumeMeanHistory, ThoraxDepthTimeHistory, LastAvgVolume);
 }
 
 FVector2D AARHUD::ToScreenSpace(float X, float Y) const
@@ -696,6 +703,7 @@ void AARHUD::ToggleRecording()
     else
     {
         UE_LOG(LogTemp, Log, TEXT("Fine registrazione sessione respiro. Campioni: %d, Annotazioni: %d"), CurrentSession.Values.Num(), CurrentSession.Annotations.Num());
-        USessionExporter::ExportSession(this, CurrentSession);
+        if (CurrentSession.Values.Num() > 100)
+            USessionExporter::ExportSession(this, CurrentSession);
     }
 }

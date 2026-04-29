@@ -27,8 +27,9 @@ class IOX_API UDepthGraphWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable, Category="Depth Graph")
 	void SetGraphData(const TArray<float>& InDepthHistory, const TArray<FDateTime>& InTimeHistory, const TArray<float>& TotalVolumes, const float InCurrentDepth, const bool bInHasDepth);
+
+	void SetGraphData(const TArray<float>& InMeanHistory, const TArray<FDateTime>& InTimeHistory, const float InLastAvgVolume);
 
 	const TArray<FDepthGraphExtremaSample>& GetExtremaHistory() const
 	{
@@ -86,6 +87,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis")
 	float VolumeFactor = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis")
+	FString YAxisUnitLabel = TEXT("mm");
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Depth Graph|YAxis")
 	bool bShowVolumeOnExtrema = true;

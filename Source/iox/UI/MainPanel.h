@@ -26,13 +26,18 @@ public:
     TObjectPtr<UDepthGraphWidget> WBPDepthGraph;
     
     UPROPERTY(meta = (BindWidget), BlueprintReadOnly)
+    TObjectPtr<UDepthGraphWidget> WBPVolumeMeanGraph;
+    UPROPERTY(meta = (BindWidget), BlueprintReadOnly)
     TObjectPtr<UTextBlock> Volume;
 
     UPROPERTY(meta = (BindWidget), BlueprintReadOnly)
     TObjectPtr<UButton> StartRec;
 
-	UFUNCTION(BlueprintCallable, Category="UI|MainPanel")
-	void UpdateThoraxDepthGraph(const TArray<float>& History, const TArray<FDateTime>& TimeHistory, const TArray<float>& TotalVolumes, float LatestDepth, bool bHasDepth);
+    UFUNCTION(BlueprintCallable, Category="UI|MainPanel")
+    void UpdateThoraxDepthGraph(const TArray<float>& History, const TArray<FDateTime>& TimeHistory, const TArray<float>& TotalVolumes, float LatestDepth, bool bHasDepth);
+
+    UFUNCTION(BlueprintCallable, Category="UI|MainPanel")
+    void UpdateMeanVolumeGraph(const TArray<float>& VolumeMeanHistory, const TArray<FDateTime>& TimeHistory, float LastAvgVolume);
 
     UFUNCTION(BlueprintCallable, Category="UI|MainPanel")
     void UpdateTotalVolume(float TotalVolume);
